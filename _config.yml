@@ -1,8 +1,23 @@
-title: Just the Docs Template
-description: A starter template for a Jeykll site using the Just the Docs theme!
+title: Liam Bennicoff | Brand Experiences
+description: Brand activations, event marketing, hosting, and content that make brands memorable.
 theme: just-the-docs
 
-url: https://just-the-docs.github.io
+email: liam.bennicoff@gmail.com
+booking_url: https://glowful.so/embed/DPGFTl4cQ5ubZ9Cj7hMi
 
-aux_links:
-  Template Repository: https://github.com/just-the-docs/just-the-docs-template
+socials:
+  - name: Instagram
+    handle: "@liambennicoff"
+    url: https://www.instagram.com/liambennicoff/
+  - name: Facebook
+    handle: "@liambennicoff"
+    url: https://www.facebook.com/liambennicoff
+  - name: LinkedIn
+    handle: "@liambennicoff"
+    url: https://www.linkedin.com/in/liambennicoff/
+
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - README.md
+  - LICENSE

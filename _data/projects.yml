@@ -1,0 +1,90 @@
+- id: nightmare-bar
+  title: Nightmare Bar
+  client: Smirnoff
+  location: Minneapolis, MN
+  category: hosting
+  image: /assets/images/nightmare-host.jpg
+  alt: Liam hosting the Nightmare Bar Halloween experience
+  description: A Halloween pop-up built around themed welcome drinks, a costume contest, trivia, bingo, photo moments, and an interactive Trick or Treat wheel. More than 3,000 guests attended across October.
+  role: Lead host, guest engagement, and on-site event leadership.
+- id: super-troopers
+  title: Super Troopers 3 at WWE SummerSlam
+  client: Super Troopers 3 / WWE
+  location: Minneapolis, MN
+  category: content
+  image: /assets/images/super-troopers.jpg
+  alt: Liam in costume at the Super Troopers 3 promotion during WWE SummerSlam
+  description: Promotional video and creator collaboration around Super Troopers 3, featuring the Haroon Twins and Amour Kiki. The creators' audiences collectively span millions of followers.
+  role: Creator outreach, filming coordination, and promotional content support.
+- id: sargento-tour
+  title: The Sargento Cheese Wheeler Tour
+  client: Sargento
+  location: Minnesota & Kentucky
+  category: tour
+  image: /assets/images/sargento-tour.jpg
+  alt: The Sargento Cheese Wheeler tour truck and activation team
+  description: A branded mobile experience bringing Sargento's Cheese Wheeler to event stops, with a welcoming team and on-site guest engagement.
+  role: Brand ambassador, activation support, tour coordination, and reporting.
+- id: instax-joyride
+  title: Instax Joyride Tour
+  client: Fujifilm Instax
+  location: Minneapolis, MN
+  category: activation
+  image: /assets/images/instax-activation.jpg
+  alt: The Fujifilm Instax activation team posing together
+  description: A bright, camera-forward activation at Taste of Minnesota, pairing a distinctive Instax photo moment with a lively public event.
+  role: Brand representation and guest-facing activation support.
+- id: toyota-special-olympics
+  title: Toyota x Special Olympics Minnesota
+  client: Toyota
+  location: Minnesota
+  category: activation
+  image: /assets/images/toyota-special-olympics.jpg
+  alt: Liam speaking with a guest at the Toyota and Special Olympics Minnesota activation
+  description: A community event bringing Toyota and Special Olympics Minnesota together in a welcoming, highly visible brand experience.
+  role: Brand ambassador and on-site guest engagement.
+- id: red-bull-speedway
+  title: Red Bull at Iowa Speedway
+  client: Red Bull
+  location: Iowa Speedway, IA
+  category: activation
+  image: /assets/images/red-bull-speedway.jpg
+  alt: Red Bull race car and branded fan experience at Iowa Speedway
+  description: A high-energy race-day setting with Red Bull motorsports visuals, a fan-facing activation, and sampling.
+  role: Brand representation and attendee engagement.
+- id: big-ten-kickoff
+  title: Big Ten Network Kickoff
+  client: Coca-Cola / Big Ten Network
+  location: Minnesota
+  category: activation
+  image: /assets/images/coca-cola-kickoff.jpg
+  alt: Liam at the Coca-Cola and Big Ten kickoff event
+  description: A Coca-Cola brand presence at a Big Ten Network kickoff, connecting with fans in a lively college sports setting.
+  role: Brand ambassador and event-day guest engagement.
+- id: samsons-tour
+  title: Samson's Grapes Tour
+  client: Samson's Grapes
+  location: Minnesota & Wisconsin
+  category: tour
+  image: /assets/images/samsons-tour.jpg
+  alt: Samson's Grapes branded tour truck parked at an event
+  description: A multi-stop branded tour supported by a coordinated field team and consistent event setup.
+  role: Tour production, activation setup, reporting, and team coordination.
+- id: sargento-minnesota
+  title: Sargento Minnesota Activations
+  client: Sargento
+  location: Minnesota
+  category: activation
+  image: /assets/images/sargento-minnesota.jpg
+  alt: Liam engaging with a guest at a Sargento Minnesota event
+  description: Community-facing Sargento event work focused on approachable product experiences and memorable guest interactions.
+  role: Brand ambassador and activation support.
+- id: target-together
+  title: Target Together
+  client: Target
+  location: Minnesota
+  category: activation
+  image: /assets/images/target-together.jpg
+  alt: Target Together brand activation in Minnesota
+  description: An event-day brand experience captured in the Target Together Minnesota photo collection.
+  role: Brand representation and on-site activation support.
