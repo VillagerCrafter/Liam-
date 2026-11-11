@@ -178,6 +178,16 @@
     if (!element.dataset.cmsId) element.dataset.cmsId = `element-${index}-${element.tagName.toLowerCase()}`;
   });
 
+  const persistDraft = () => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ savedAt: Date.now(), state, undoHistory, redoHistory }));
+      return true;
+    } catch (error) {
+      setStatus(`Could not save your local draft: ${error.message}`, "error");
+      return false;
+    }
+  };
+
   const saveDraft = () => {
     const snapshot = JSON.stringify(state);
     if (historyReady && lastHistorySnapshot && snapshot !== lastHistorySnapshot) {
@@ -188,11 +198,8 @@
     lastHistorySnapshot = snapshot;
     window.clearTimeout(draftTimer);
     draftTimer = window.setTimeout(() => {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ savedAt: Date.now(), state, undoHistory, redoHistory }));
+      if (persistDraft()) {
         setStatus("Draft saved in this browser.", "saved");
-      } catch (error) {
-        setStatus(`Could not save your local draft: ${error.message}`, "error");
       }
     }, 250);
   };
@@ -717,6 +724,7 @@
 
   const publish = async () => {
     window.clearTimeout(draftTimer);
+    const recoveryDraftSaved = persistDraft();
     const button = byId("admin-publish");
     button.disabled = true;
     setStatus("Updating the paired public preview…");
@@ -736,7 +744,8 @@
       }
       setStatus("Updated! The public preview has refreshed.", "saved");
     } catch (error) {
-      setStatus(`Could not update the website: ${error.message}`, "error");
+      const recoveryNotice = recoveryDraftSaved ? "" : " Your browser could not save a recovery draft.";
+      setStatus(`Could not update the website: ${error.message}.${recoveryNotice}`, "error");
     } finally {
       button.disabled = false;
     }

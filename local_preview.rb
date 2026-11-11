@@ -7,6 +7,7 @@ require "yaml"
 require "net/http"
 require "uri"
 require "timeout"
+require "tempfile"
 
 ROOT = __dir__
 PREVIEW = File.join(ROOT, "_admin_preview")
@@ -75,6 +76,23 @@ def safe_https_url(value)
   uri.to_s
 rescue URI::InvalidURIError
   ""
+end
+
+def atomic_write(path, contents)
+  Tempfile.create([".#{File.basename(path)}-", ".tmp"], File.dirname(path)) do |file|
+    file.binmode
+    file.write(contents)
+    file.flush
+    file.fsync
+    temporary_path = file.path
+    file.close
+    File.rename(temporary_path, path)
+  end
+end
+
+def valid_upload?(path, uploads_path)
+  path.is_a?(String) && path.match?(%r{\A/uploads/[\w.-]+\z}) &&
+    File.file?(File.join(uploads_path, File.basename(path)))
 end
 
 def secure_password_match?(provided)
@@ -401,6 +419,80 @@ server.mount_proc("/api/") do |request, response|
         json_response(response, 422, { error: "The edit data is incomplete or invalid." })
         next
       end
+      sections = content["sections"]
+      valid_sections = sections.length <= 100 && sections.all? do |item|
+        item.is_a?(Hash) && item["id"].to_s.match?(/\Apage-[\w-]+\z/) &&
+          item["title"].is_a?(String) && item["title"].length.between?(1, 160) &&
+          item["text"].is_a?(String) && item["text"].length <= 10_000
+      end
+      projects = content["projects"]
+      valid_projects = projects.length <= 200 && projects.all? do |item|
+        item.is_a?(Hash) && item["id"].to_s.match?(/\Acustom-[\w-]+\z/) &&
+          item["title"].is_a?(String) && item["title"].length.between?(1, 160) &&
+          item["client"].is_a?(String) && item["client"].length <= 180 &&
+          item["location"].is_a?(String) && item["location"].length <= 180 &&
+          %w[activation tour content hosting].include?(item["category"]) &&
+          valid_upload?(item["image"], uploads_path) &&
+          item["alt"].is_a?(String) && item["alt"].length <= 180 &&
+          item["description"].is_a?(String) && item["description"].length <= 10_000 &&
+          item["role"].is_a?(String) && item["role"].length <= 2_000
+      end
+      section_order = content["sectionOrder"]
+      valid_section_order = section_order.length <= 100 &&
+        section_order.all? { |id| id.is_a?(String) && id.match?(/\A[\w-]+\z/) } &&
+        section_order.uniq.length == section_order.length
+      edits = content["edits"]
+      valid_edits = edits.length <= 2_000 && edits.all? do |id, edit|
+        next false unless id.match?(/\A[\w-]+\z/) && edit.is_a?(Hash)
+
+        styles = edit["styles"]
+        allowed_styles = %w[width height fontSize left top color backgroundColor fontWeight fontStyle textShadow maxWidth fontFamily]
+        valid_styles = styles.nil? || (
+          styles.is_a?(Hash) && styles.length <= 20 &&
+          styles.all? do |name, value|
+            allowed_styles.include?(name) &&
+              (value.is_a?(Numeric) ? value.finite? : value.is_a?(String) && value.length <= 300)
+          end
+        )
+        resize = edit["resize"]
+        valid_resize = resize.nil? || (
+          resize.is_a?(Hash) &&
+          resize["width"].is_a?(Numeric) && resize["width"].finite? && resize["width"].between?(40, 2_400) &&
+          resize["height"].is_a?(Numeric) && resize["height"].finite? && resize["height"].between?(30, 1_800) &&
+          %w[offsetX offsetY].all? do |key|
+            !resize.key?(key) || (resize[key].is_a?(Numeric) && resize[key].finite? && resize[key].between?(-20_000, 20_000))
+          end
+        )
+        crop = edit["crop"]
+        valid_crop = crop.nil? || (
+          crop.is_a?(Hash) && %w[cover contain fill].include?(crop["fit"]) &&
+          %w[x y].all? { |key| crop[key].is_a?(Numeric) && crop[key].finite? && crop[key].between?(0, 100) }
+        )
+        slideshow = edit["slideshow"]
+        valid_slideshow = slideshow.nil? || (
+          slideshow.is_a?(Hash) && slideshow["items"].is_a?(Array) &&
+          slideshow["items"].length.between?(2, 30) &&
+          slideshow["items"].all? { |item| valid_upload?(item, uploads_path) } &&
+          slideshow["interval"].is_a?(Numeric) && slideshow["interval"].finite? &&
+          slideshow["interval"].between?(2, 300)
+        )
+        valid_text = %w[text serviceDescription serviceExample alt].all? do |key|
+          !edit.key?(key) || (edit[key].is_a?(String) && edit[key].length <= 10_000)
+        end
+        valid_media = !edit.key?("media") || valid_upload?(edit["media"], uploads_path)
+        href = edit["href"]
+        valid_href = href.nil? || (
+          href.is_a?(String) &&
+          href.match?(%r{\A(?:https?://\S+|mailto:\S+|/(?!/)\S*|#[\w-]+)\z}i)
+        )
+        src = edit["src"]
+        valid_src = src.nil? || (
+          src.is_a?(String) && src.match?(%r{\A(?:https://\S+|/(?!/)\S*)\z}i)
+        )
+        valid_animation = !edit.key?("animation") || %w[none fade float spin pulse slideshow].include?(edit["animation"])
+        valid_styles && valid_resize && valid_crop && valid_slideshow && valid_text &&
+          valid_media && valid_href && valid_src && valid_animation
+      end
       buttons = content["buttons"] || []
       valid_button = buttons.length <= 50 && buttons.all? do |item|
         item.is_a?(Hash) && item["id"].to_s.match?(/\Acustom-cta-[\w-]+\z/) &&
@@ -433,24 +525,46 @@ server.mount_proc("/api/") do |request, response|
       end
       video_settings = content["heroVideos"]
       valid_videos = video_settings.nil? || (
+        video_settings.is_a?(Hash) &&
         video_settings["items"].is_a?(Array) && video_settings["items"].length <= 12 &&
         video_settings["items"].all? do |item|
-          item.is_a?(String) && item.match?(%r{\A/uploads/[\w.-]+\z}) &&
-            File.file?(File.join(uploads_path, File.basename(item)))
+          valid_upload?(item, uploads_path)
         end &&
-        video_settings["interval"].to_s.match?(/\A\d+(?:\.\d+)?\z/) &&
-        video_settings["interval"].to_f.between?(3, 300)
+        video_settings["interval"].is_a?(Numeric) && video_settings["interval"].finite? &&
+        video_settings["interval"].between?(3, 300)
       )
       font = content["googleFont"]
       valid_font = font.nil? || font == "" || (
         font.is_a?(String) && JSON.parse(File.read(File.join(ROOT, "assets", "data", "google-fonts.json"))).include?(font)
       )
-      unless valid_button && valid_media_elements && valid_content_blocks && valid_videos && valid_font
+      font_file = content["fontFile"]
+      valid_font_file = font_file.nil? || (
+        font_file.is_a?(Hash) && valid_upload?(font_file["url"], uploads_path) &&
+        %w[woff woff2 truetype opentype].include?(font_file["format"])
+      )
+      valid_theme = %w[original coastal sunset violet].include?(content["theme"])
+      valid_font_family = %w[inherit custom].include?(content["fontFamily"]) ||
+        ["Georgia, serif", "Arial, sans-serif"].include?(content["fontFamily"])
+      unless valid_sections && valid_projects && valid_section_order && valid_edits &&
+          valid_button && valid_media_elements && valid_content_blocks && valid_videos &&
+          valid_font && valid_font_file && valid_theme && valid_font_family
         json_response(response, 422, { error: "A button, content block, image element, rotating video, or Google Font setting is invalid." })
         next
       end
-      File.write(content_path, JSON.pretty_generate(content) + "\n")
-      File.write(File.join(PREVIEW, "site-content.json"), JSON.pretty_generate(content) + "\n")
+      published_json = JSON.pretty_generate(content) + "\n"
+      previous_content = File.binread(content_path)
+      preview_content_path = File.join(PREVIEW, "site-content.json")
+      begin
+        atomic_write(content_path, published_json)
+        atomic_write(preview_content_path, published_json)
+      rescue SystemCallError, IOError => error
+        begin
+          atomic_write(content_path, previous_content)
+        rescue SystemCallError, IOError => rollback_error
+          warn "Could not roll back a failed publish: #{rollback_error.message}"
+        end
+        raise error
+      end
       json_response(response, 200, { ok: true, message: "Edits published to the paired public preview." })
     rescue JSON::ParserError
       json_response(response, 400, { error: "The edit data could not be read." })
