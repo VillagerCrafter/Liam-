@@ -11,7 +11,10 @@
   ].join(",");
   const CANDIDATE_SELECTOR = `${TEXT_SELECTOR},img,video,section,article,div,form,nav,footer,header,iframe,.service-open,button`;
   const STORAGE_KEY = "liam-portfolio-admin-draft-v1";
+  const VERSION_STORAGE_KEY = "liam-portfolio-admin-versions-v1";
+  const CASE_STUDY_PREVIEW_KEY = "liam-portfolio-case-study-preview-v1";
   const contentUrl = document.querySelector('script[data-content-url]')?.dataset.contentUrl || "/site-content.json";
+  const siteBaseUrl = document.querySelector('script[data-content-url]')?.dataset.siteBaseurl || "";
   const textBox = (label, id) => `<label class="admin-full" for="${id}">${label}<textarea id="${id}"></textarea></label>`;
   const numberBox = (label, id, step = "1") => `<label>${label}<input id="${id}" type="number" step="${step}"></label>`;
 
@@ -29,12 +32,27 @@
       <button id="admin-edit-mode" class="admin-primary" type="button" aria-pressed="true">Edit page</button>
       <button id="admin-nav-mode" type="button" aria-pressed="false">Navigate</button>
     </div>
+    <div class="admin-preview-modes" role="group" aria-label="Preview website width">
+      <button type="button" data-preview-mode="desktop" aria-pressed="true">Desktop</button>
+      <button type="button" data-preview-mode="tablet" aria-pressed="false">Tablet</button>
+      <button type="button" data-preview-mode="mobile" aria-pressed="false">Mobile</button>
+    </div>
     <p class="admin-hint">Double-click text to edit it. Double-click a photo or video to replace it. Select other items to adjust, move, or remove them.</p>
     <details class="admin-tool-group" open>
       <summary>Build your page</summary>
       <fieldset><legend>Add to the page</legend>
+      <label class="admin-full" for="admin-section-template">Section layout
+        <select id="admin-section-template">
+          <option value="editorial">Editorial introduction</option>
+          <option value="case-study">Project story: challenge, approach, result</option>
+        </select>
+      </label>
+      <label class="admin-full" for="admin-new-section-title">New section name
+        <input id="admin-new-section-title" maxlength="160" placeholder="e.g. Recent campaign">
+      </label>
       <button class="admin-full admin-primary" id="admin-add-section" type="button">＋ Add page section</button>
       <button class="admin-full admin-primary" id="admin-add-project" type="button">＋ Add portfolio project</button>
+      <small class="admin-full">Duplicate a section to reuse its existing layout and content.</small>
     </fieldset>
       <fieldset><legend>Add content to a section</legend>
         <label class="admin-full" for="admin-block-target">Place in section
@@ -76,6 +94,23 @@
       <label class="admin-full" for="admin-href">Link or embed destination<input id="admin-href" type="url"></label>
       <label class="admin-full" for="admin-service-description">Expanded service description<textarea id="admin-service-description"></textarea></label>
       <label class="admin-full" for="admin-service-example">Service example<textarea id="admin-service-example"></textarea></label>
+      <fieldset class="admin-full" id="admin-project-fields" hidden>
+        <legend>Portfolio case study</legend>
+        <label class="admin-full" for="admin-project-title">Project title<input id="admin-project-title" maxlength="160"></label>
+        <label class="admin-full" for="admin-project-client">Brand or client<input id="admin-project-client" maxlength="180"></label>
+        <label class="admin-full" for="admin-project-location">Event or location<input id="admin-project-location" maxlength="180"></label>
+        <label class="admin-full" for="admin-project-category">Category
+          <select id="admin-project-category">
+            <option value="activation">Activation</option><option value="tour">Tour</option>
+            <option value="content">Content</option><option value="hosting">Hosting</option>
+          </select>
+        </label>
+        <label class="admin-full" for="admin-project-description">Project summary<textarea id="admin-project-description"></textarea></label>
+        <label class="admin-full" for="admin-project-role">My role<textarea id="admin-project-role"></textarea></label>
+        <label class="admin-full" for="admin-project-alt">Case-study image description<input id="admin-project-alt" maxlength="180"></label>
+        <button class="admin-full" id="admin-project-preview" type="button">Preview case study page</button>
+        <small class="admin-full">The project ID and page URL stay stable when you edit its details.</small>
+      </fieldset>
       <button class="admin-full" id="admin-parent" type="button" disabled>Select parent element</button>
       <small class="admin-full" id="admin-media-hint">Images, videos, and uploaded fonts are saved with this project.</small>
     </fieldset>
@@ -107,16 +142,21 @@
       <summary>Page sections</summary>
     <fieldset>
       <div class="admin-full" id="admin-sections"></div>
-      <div class="admin-button-row admin-full">
-        <button id="admin-move-up" type="button">Move section ↑</button>
-        <button id="admin-move-down" type="button">Move section ↓</button>
-      </div>
     </fieldset>
+    </details>
+    <details class="admin-tool-group">
+      <summary>Version history</summary>
+      <fieldset>
+        <label class="admin-full" for="admin-version-list">Published versions saved before updates</label>
+        <select id="admin-version-list"></select>
+        <button class="admin-full" id="admin-version-restore" type="button">Restore selected version to draft</button>
+        <small class="admin-full">Restoring loads a recoverable draft; it does not change the public preview until you publish.</small>
+      </fieldset>
     </details>
     <button class="admin-danger" id="admin-delete" type="button" disabled>Delete selected element</button>
     <button id="admin-restore" type="button">Restore hidden elements</button>
     <button id="admin-reset-draft" type="button">Discard local draft</button>
-    <small>Changes stay in this browser until you select Update website. It updates this computer's paired public preview, not the live hosted site.</small>
+    <small>Drafts stay in this browser. Update website changes this computer's paired preview; publishing to GitHub Pages is a separate step.</small>
     <input id="admin-media-file" type="file" accept="image/*,video/mp4,video/webm" hidden>
     <input id="admin-font-file" type="file" accept=".woff,.woff2,.ttf,.otf,font/woff,font/woff2,font/ttf,font/otf" hidden>
   `;
@@ -130,7 +170,7 @@
   const fontInput = byId("admin-font-file");
   const selectionName = byId("admin-selection-name");
   const main = document.querySelector("main");
-  let state = { version: 1, edits: {}, sections: [], sectionOrder: [], projects: [], contentBlocks: [], buttons: [], mediaElements: [], heroVideos: null, theme: "original", fontFamily: "inherit", googleFont: "", fontFile: null };
+  let state = { version: 1, edits: {}, sections: [], sectionCopies: [], sectionOrder: [], projects: [], contentBlocks: [], buttons: [], mediaElements: [], heroVideos: null, theme: "original", fontFamily: "inherit", googleFont: "", fontFile: null };
   let selected = null;
   let editMode = true;
   let dragMode = false;
@@ -223,15 +263,50 @@
 
   const scrollToSection = (section) => section?.scrollIntoView({ behavior: "smooth", block: "start" });
 
+  const sectionTitle = (section) =>
+    (section.querySelector("h1,h2,h3")?.textContent || section.id || "Page section").trim();
+
+  const sectionCopyEditId = (copyId, index) => `${copyId}-element-${index + 1}`;
+
   const renderSectionList = () => {
     const list = byId("admin-sections");
     list.replaceChildren();
     [...document.querySelectorAll("main > section")].forEach((section) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.textContent = (section.querySelector("h1,h2,h3")?.textContent || section.id || "Page section").trim();
-      button.addEventListener("click", () => scrollToSection(section));
-      list.append(button);
+      const row = document.createElement("div");
+      row.className = "admin-section-row";
+      row.dataset.sectionId = section.dataset.cmsId;
+      if (section.hidden) row.classList.add("is-hidden");
+      const label = document.createElement("span");
+      label.className = "admin-section-title";
+      label.textContent = sectionTitle(section);
+      const actions = document.createElement("div");
+      actions.className = "admin-section-actions";
+      const addAction = (name, labelText, action, className = "") => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = labelText;
+        button.setAttribute("aria-label", `${name} section ${sectionTitle(section)}`);
+        if (className) button.className = className;
+        button.addEventListener("click", (event) => {
+          event.stopPropagation();
+          action(section, row);
+        });
+        actions.append(button);
+      };
+      addAction("Select", "Select", (target) => {
+        selectElement(target);
+        scrollToSection(target);
+      });
+      addAction("Move up", "↑", (target) => moveSection(target, -1));
+      addAction("Move down", "↓", (target) => moveSection(target, 1));
+      addAction("Duplicate", "Duplicate", duplicateSection);
+      addAction("Rename", "Rename", renameSection);
+      addAction(section.hidden ? "Show" : "Hide", section.hidden ? "Show" : "Hide", toggleSectionVisibility);
+      if (section.classList.contains("cms-new-section") || section.classList.contains("cms-section-copy")) {
+        addAction("Delete", "Delete", deleteAddedSection, "admin-section-delete");
+      }
+      row.append(label, actions);
+      list.append(row);
     });
   };
 
@@ -329,7 +404,7 @@
         else element.dataset[name] = value;
       }
     });
-    main.querySelectorAll(".cms-new-section, .cms-published-addition, .cms-added-content-block, .cms-stock-image, .custom-cta-group, .project-card[id^='project-custom-']").forEach((element) => element.remove());
+    main.querySelectorAll(".cms-new-section, .cms-section-copy, .cms-published-addition, .cms-added-content-block, .cms-stock-image, .custom-cta-group, .project-card[id^='project-custom-']").forEach((element) => element.remove());
     originalSections.forEach((section) => main.append(section));
     document.querySelectorAll(".cms-stock-credit").forEach((caption) => caption.remove());
   };
@@ -345,12 +420,209 @@
     if ([...target.options].some((option) => option.value === previous)) target.value = previous;
   };
 
+  const appendSectionCopies = () => {
+    state.sectionCopies.forEach((copy) => {
+      const source = [...main.querySelectorAll(":scope > section")]
+        .find((section) => section.dataset.cmsId === copy.sourceId);
+      if (!source) return;
+      const clone = source.cloneNode(true);
+      clone.classList.add("cms-section-copy");
+      clone.id = copy.id;
+      clone.dataset.cmsId = copy.id;
+      clone.hidden = false;
+      const sourceIds = [source, ...source.querySelectorAll("[id]")];
+      const cloneIds = [clone, ...clone.querySelectorAll("[id]")];
+      const idMap = new Map();
+      sourceIds.forEach((sourceNode, index) => {
+        if (sourceNode.id) idMap.set(sourceNode.id, index === 0 ? copy.id : `${copy.id}-item-${index}`);
+      });
+      cloneIds.forEach((cloneNode, index) => {
+        const sourceNode = sourceIds[index];
+        if (sourceNode?.id) cloneNode.id = idMap.get(sourceNode.id);
+      });
+      clone.querySelectorAll("*").forEach((element) => {
+        for (const attribute of ["for", "aria-labelledby", "aria-describedby", "aria-controls", "aria-owns", "headers"]) {
+          const value = element.getAttribute(attribute);
+          if (value) element.setAttribute(attribute, value.split(/\s+/).map((id) => idMap.get(id) || id).join(" "));
+        }
+        const href = element.getAttribute("href");
+        if (href?.startsWith("#") && idMap.has(href.slice(1))) element.setAttribute("href", `#${idMap.get(href.slice(1))}`);
+      });
+      const sourceNodes = [source, ...source.querySelectorAll("[data-cms-id]")];
+      const cloneNodes = [clone, ...clone.querySelectorAll("[data-cms-id]")];
+      sourceNodes.forEach((sourceNode, index) => {
+        const cloneNode = cloneNodes[index];
+        if (!cloneNode) return;
+        cloneNode.dataset.cmsId = index === 0 ? copy.id : sectionCopyEditId(copy.id, index - 1);
+      });
+      clone.querySelectorAll("form,iframe,video").forEach((element) => element.remove());
+      main.append(clone);
+    });
+  };
+
+  const moveSection = (section, direction) => {
+    const sections = [...main.querySelectorAll(":scope > section")];
+    const index = sections.indexOf(section);
+    const destination = sections[index + direction];
+    if (!destination) return;
+    if (direction < 0) main.insertBefore(section, destination);
+    else main.insertBefore(destination, section);
+    state.sectionOrder = [...main.querySelectorAll(":scope > section")]
+      .map((item) => item.dataset.cmsId).filter(Boolean);
+    saveDraft();
+    renderSectionList();
+  };
+
+  const renameSection = (section, row) => {
+    const heading = section.querySelector("h1,h2,h3");
+    if (!heading) {
+      setStatus("This section has no heading to rename.", "error");
+      return;
+    }
+    const label = row.querySelector(".admin-section-title");
+    const input = document.createElement("input");
+    input.type = "text";
+    input.maxLength = 160;
+    input.value = sectionTitle(section);
+    input.setAttribute("aria-label", `New title for ${sectionTitle(section)}`);
+    label.replaceWith(input);
+    const actions = row.querySelector(".admin-section-actions");
+    actions.replaceChildren();
+    const save = document.createElement("button");
+    save.type = "button";
+    save.textContent = "Save";
+    const cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.textContent = "Cancel";
+    save.addEventListener("click", () => {
+      const value = input.value.trim();
+      if (!value) {
+        setStatus("Enter a section title before saving.", "error");
+        input.focus();
+        return;
+      }
+      selectElement(heading);
+      currentEdit().text = value;
+      heading.textContent = value;
+      heading.style.whiteSpace = "pre-line";
+      const addedSection = state.sections.find((item) => item.id === section.id);
+      if (addedSection) addedSection.title = value;
+      const copiedSection = state.sectionCopies.find((item) => item.id === section.id);
+      if (copiedSection) copiedSection.title = value;
+      saveDraft();
+      renderSectionList();
+      setStatus("Section title updated.");
+    });
+    cancel.addEventListener("click", renderSectionList);
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") save.click();
+      if (event.key === "Escape") renderSectionList();
+    });
+    actions.append(save, cancel);
+    input.focus();
+    input.select();
+  };
+
+  const toggleSectionVisibility = (section) => {
+    const edit = state.edits[section.dataset.cmsId] ||= { styles: {} };
+    edit.styles ||= {};
+    if (section.hidden) {
+      section.hidden = false;
+      delete edit.deleted;
+    } else {
+      section.hidden = true;
+      edit.deleted = true;
+    }
+    saveDraft();
+    renderSectionList();
+    setStatus(section.hidden ? "Section hidden. Use Show or Restore hidden elements to bring it back." : "Section restored.");
+  };
+
+  const duplicateSection = (section) => {
+    if (section.querySelector("form,iframe,video")) {
+      setStatus("This section contains an interactive form, embed, or video and cannot be duplicated safely.", "error");
+      return;
+    }
+    const id = `section-copy-${crypto.randomUUID()}`;
+    const title = `${sectionTitle(section)} (Copy)`.slice(0, 160);
+    const sourceNodes = [section, ...section.querySelectorAll("[data-cms-id]")];
+    sourceNodes.forEach((sourceNode, index) => {
+      const edit = state.edits[sourceNode.dataset.cmsId];
+      if (edit) {
+        const copyId = index === 0 ? id : sectionCopyEditId(id, index - 1);
+        state.edits[copyId] = JSON.parse(JSON.stringify(edit));
+      }
+    });
+    if (state.edits[id]) delete state.edits[id].deleted;
+    const sourceHeading = section.querySelector("h1,h2,h3");
+    if (sourceHeading?.dataset.cmsId) {
+      const headingIndex = sourceNodes.indexOf(sourceHeading);
+      const headingEdit = state.edits[sectionCopyEditId(id, headingIndex - 1)] ||= { styles: {} };
+      headingEdit.text = title;
+    }
+    state.sectionCopies.push({
+      id,
+      sourceId: section.dataset.cmsId,
+      title,
+    });
+    renderEditorState();
+    const duplicate = main.querySelector(`:scope > section[data-cms-id="${CSS.escape(id)}"]`);
+    if (duplicate) {
+      const order = [...main.querySelectorAll(":scope > section")]
+        .map((item) => item.dataset.cmsId).filter(Boolean);
+      const copyIndex = order.indexOf(id);
+      const sourceIndex = order.indexOf(section.dataset.cmsId);
+      if (copyIndex !== -1 && sourceIndex !== -1) {
+        order.splice(copyIndex, 1);
+        order.splice(order.indexOf(section.dataset.cmsId) + 1, 0, id);
+      }
+      state.sectionOrder = order;
+      state.sectionOrder.forEach((sectionId) => {
+        const orderedSection = main.querySelector(`:scope > section[data-cms-id="${CSS.escape(sectionId)}"]`);
+        if (orderedSection) main.append(orderedSection);
+      });
+      selectElement(duplicate);
+      scrollToSection(duplicate);
+    }
+    saveDraft();
+    renderSectionList();
+    setStatus("Section duplicated with its existing layout and content. Edit the copy independently.");
+  };
+
+  const deleteAddedSection = (section) => {
+    if (!window.confirm(`Permanently remove "${sectionTitle(section)}" and any copies based on it? You can undo this change.`)) return;
+    const removed = new Set([section.dataset.cmsId]);
+    let expanded = true;
+    while (expanded) {
+      expanded = false;
+      state.sectionCopies.forEach((copy) => {
+        if (removed.has(copy.sourceId) && !removed.has(copy.id)) {
+          removed.add(copy.id);
+          expanded = true;
+        }
+      });
+    }
+    state.sections = state.sections.filter((item) => !removed.has(item.id));
+    state.sectionCopies = state.sectionCopies.filter((item) => !removed.has(item.id));
+    state.contentBlocks = state.contentBlocks.filter((item) => !removed.has(item.sectionId));
+    state.buttons = state.buttons.filter((item) => !removed.has(item.sectionId));
+    state.mediaElements = state.mediaElements.filter((item) => !removed.has(item.sectionId));
+    Object.keys(state.edits).forEach((id) => {
+      if ([...removed].some((removedId) => id === removedId || id.startsWith(`${removedId}-`))) delete state.edits[id];
+    });
+    state.sectionOrder = state.sectionOrder.filter((id) => !removed.has(id));
+    if (selected && [...removed].includes(selected.closest("main > section")?.dataset.cmsId)) selected = null;
+    renderEditorState();
+    saveDraft();
+    setStatus("Added section removed. Use Undo to restore it if needed.");
+  };
+
   const renderEditorState = () => {
     restoreOriginalPage();
     state.sections.forEach((section) => {
       if (document.getElementById(section.id)) return;
       const node = document.createElement("section");
-      node.className = "added-page-section section-pad cms-new-section";
+      node.className = `added-page-section section-pad cms-new-section${section.layout === "case-study" ? " cms-section-layout-case-study" : ""}`;
       node.id = section.id;
       node.dataset.cmsId = section.id;
       const inner = document.createElement("div");
@@ -367,6 +639,8 @@
     });
     state.projects.forEach(addProjectCard);
     state.contentBlocks.forEach(addContentBlock);
+    assignContentIds();
+    appendSectionCopies();
     assignContentIds();
     for (const [id, edit] of Object.entries(state.edits || {})) {
       const element = document.querySelector(`[data-cms-id="${CSS.escape(id)}"]`);
@@ -432,11 +706,13 @@
     const published = await response.json();
     Object.assign(state, { ...state, ...published, edits: published.edits || {}, sections: published.sections || [], projects: published.projects || [] });
 
+    state.sectionCopies ||= [];
     const draftText = localStorage.getItem(STORAGE_KEY);
     if (draftText) {
       const draft = JSON.parse(draftText);
       if (draft.savedAt && draft.state) {
         Object.assign(state, { ...state, ...draft.state, edits: draft.state.edits || {}, sections: draft.state.sections || [], projects: draft.state.projects || [] });
+        state.sectionCopies = draft.state.sectionCopies || [];
         undoHistory = Array.isArray(draft.undoHistory) ? draft.undoHistory.slice(-50) : [];
         redoHistory = Array.isArray(draft.redoHistory) ? draft.redoHistory.slice(-50) : [];
         setStatus("Restored an unpublished draft from this browser.");
@@ -445,6 +721,7 @@
 
     state.edits ||= {};
     state.sections ||= [];
+    state.sectionCopies ||= [];
     state.projects ||= [];
     state.contentBlocks ||= [];
     state.buttons ||= [];
@@ -470,6 +747,7 @@
     Object.assign(state, restored);
     state.edits ||= {};
     state.sections ||= [];
+    state.sectionCopies ||= [];
     state.projects ||= [];
     state.contentBlocks ||= [];
     state.buttons ||= [];
@@ -521,6 +799,49 @@
     byId("admin-font").value = state.fontFile ? "custom" : (state.fontFamily || "inherit");
   };
 
+  const projectForElement = (element) => {
+    const card = element?.closest(".project-card");
+    return card ? state.projects.find((project) => card.id === `project-${project.id}`) : null;
+  };
+
+  const updateProjectField = (field, value) => {
+    const project = projectForElement(selected);
+    if (!project) return;
+    project[field] = value;
+    const card = selected.closest(".project-card");
+    if (field === "title") {
+      card.querySelector("h3").textContent = value;
+      card.setAttribute("aria-label", `View case study: ${value}`);
+    } else if (field === "client") {
+      card.querySelector(".project-meta span:first-child").textContent = value;
+    } else if (field === "location") {
+      card.querySelector(".project-meta span:last-child").textContent = value;
+    } else if (field === "category") {
+      card.dataset.category = value;
+    } else if (field === "description") {
+      card.querySelector(".project-description").textContent = value;
+    } else if (field === "role") {
+      const role = card.querySelector(".project-role");
+      role.replaceChildren(role.firstElementChild.cloneNode(true), document.createTextNode(value));
+    } else if (field === "alt") {
+      card.querySelector("img").alt = value;
+    }
+    saveDraft();
+  };
+
+  const previewCaseStudy = () => {
+    const project = projectForElement(selected);
+    if (!project) return;
+    try {
+      localStorage.setItem(CASE_STUDY_PREVIEW_KEY, JSON.stringify(state));
+      const previewUrl = `${siteBaseUrl}/projects/?project=${encodeURIComponent(project.id)}&preview=draft`;
+      window.open(previewUrl, "_blank", "noopener,noreferrer");
+      setStatus("Draft case study preview opened. This does not publish your changes.");
+    } catch (error) {
+      setStatus(`Could not prepare the case-study preview: ${error.message}`, "error");
+    }
+  };
+
   const selectElement = (element) => {
     if (!element || toolbar.contains(element)) return;
     selected?.classList.remove("cms-highlight");
@@ -544,6 +865,18 @@
     byId("admin-service-description").value = edit.serviceDescription ?? (serviceButton?.dataset.serviceDescription || "");
     byId("admin-service-example").disabled = !selected.matches(".service-open");
     byId("admin-service-example").value = edit.serviceExample ?? (serviceButton?.dataset.serviceExample || "");
+    const project = projectForElement(selected);
+    const projectFields = byId("admin-project-fields");
+    projectFields.hidden = !project;
+    if (project) {
+      byId("admin-project-title").value = project.title || "";
+      byId("admin-project-client").value = project.client || "";
+      byId("admin-project-location").value = project.location || "";
+      byId("admin-project-category").value = project.category || "activation";
+      byId("admin-project-description").value = project.description || "";
+      byId("admin-project-role").value = project.role || "";
+      byId("admin-project-alt").value = project.alt || "";
+    }
     byId("admin-parent").disabled = !selected.parentElement?.matches(CANDIDATE_SELECTOR);
     byId("admin-delete").disabled = selected.tagName === "MAIN";
     for (const [id, name] of [["admin-width", "width"], ["admin-height", "height"], ["admin-font-size", "fontSize"], ["admin-left", "left"], ["admin-top", "top"]]) {
@@ -563,6 +896,10 @@
     card.className = "project-card";
     card.id = `project-${project.id}`;
     card.dataset.category = project.category || "activation";
+    card.dataset.projectUrl = `${siteBaseUrl}/projects/?project=${encodeURIComponent(project.id)}`;
+    card.setAttribute("role", "link");
+    card.tabIndex = 0;
+    card.setAttribute("aria-label", `View case study: ${project.title}`);
     const imageWrap = document.createElement("div");
     imageWrap.className = "project-image-wrap";
     const image = document.createElement("img");
@@ -727,8 +1064,9 @@
     const recoveryDraftSaved = persistDraft();
     const button = byId("admin-publish");
     button.disabled = true;
-    setStatus("Updating the paired public preview…");
+    setStatus("Saving a recovery version, then updating the paired preview…");
     try {
+      await savePublishedVersion();
       const response = await fetch("/api/publish", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -742,7 +1080,8 @@
         channel.postMessage("published");
         channel.close();
       }
-      setStatus("Updated! The public preview has refreshed.", "saved");
+      renderVersionList();
+      setStatus("Updated the paired preview. Your GitHub Pages site changes after a separate GitHub deployment.", "saved");
     } catch (error) {
       const recoveryNotice = recoveryDraftSaved ? "" : " Your browser could not save a recovery draft.";
       setStatus(`Could not update the website: ${error.message}.${recoveryNotice}`, "error");
@@ -752,30 +1091,46 @@
   };
 
   const addSection = () => {
-    const title = window.prompt("What should this new page section be called?");
-    if (!title?.trim()) return;
+    const titleInput = byId("admin-new-section-title");
+    const title = titleInput.value.trim();
+    if (!title) {
+      setStatus("Enter a name for the new section first.", "error");
+      titleInput.focus();
+      return;
+    }
     const id = `page-${crypto.randomUUID()}`;
-    const section = { id, title: title.trim(), text: "Add your introduction here." };
+    const layout = byId("admin-section-template").value;
+    const section = {
+      id,
+      title,
+      text: "Add your introduction here.",
+      layout: layout === "case-study" ? "case-study" : "editorial",
+    };
     state.sections.push(section);
-    const node = document.createElement("section");
-    node.className = "added-page-section section-pad cms-new-section";
-    node.id = id;
-    node.dataset.cmsId = id;
-    const inner = document.createElement("div");
-    inner.className = "page-width";
-    const heading = document.createElement("h2");
-    heading.textContent = section.title;
-    heading.dataset.cmsId = `${id}-title`;
-    const paragraph = document.createElement("p");
-    paragraph.textContent = section.text;
-    paragraph.dataset.cmsId = `${id}-text`;
-    inner.append(heading, paragraph);
-    node.append(inner);
-    main.append(node);
+    if (state.sectionOrder.length) state.sectionOrder.push(id);
+    if (section.layout === "case-study") {
+      for (const [heading, text] of [
+        ["Challenge", "Describe the audience or brand challenge."],
+        ["Approach", "Explain the creative experience and execution."],
+        ["Result", "Share the outcome and what made it successful."],
+      ]) {
+        state.contentBlocks.push(
+          { id: `content-block-${crypto.randomUUID()}`, sectionId: id, type: "heading", text: heading },
+          { id: `content-block-${crypto.randomUUID()}`, sectionId: id, type: "text", text },
+        );
+      }
+    }
+    renderEditorState();
+    titleInput.value = "";
     saveDraft();
-    renderSectionList();
-    selectElement(node);
-    scrollToSection(node);
+    const node = document.getElementById(id);
+    if (node) {
+      selectElement(node);
+      scrollToSection(node);
+    }
+    setStatus(section.layout === "case-study"
+      ? "Project story section added. Replace the challenge, approach, and result prompts with your details."
+      : "Editorial section added. Select its heading or text to edit it.");
   };
 
   const addPortfolioProject = async () => {
@@ -813,18 +1168,89 @@
     }
   };
 
-  const moveSelectedSection = (direction) => {
-    const section = selected?.closest("main > section");
-    if (!section) return;
-    const sections = [...main.querySelectorAll(":scope > section")];
-    const index = sections.indexOf(section);
-    const destination = sections[index + direction];
-    if (!destination) return;
-    if (direction < 0) main.insertBefore(section, destination);
-    else main.insertBefore(destination, section);
-    state.sectionOrder = [...main.querySelectorAll(":scope > section")].map((item) => item.dataset.cmsId).filter(Boolean);
-    saveDraft();
-    renderSectionList();
+  const readVersionSnapshots = () => {
+    const saved = localStorage.getItem(VERSION_STORAGE_KEY);
+    if (!saved) return [];
+    const versions = JSON.parse(saved);
+    if (!Array.isArray(versions) || versions.length > 10 || versions.some((version) =>
+      !version || !Number.isFinite(version.savedAt) || version.state?.version !== 1)) {
+      throw new Error("The saved version history is invalid. It was left untouched.");
+    }
+    return versions;
+  };
+
+  const renderVersionList = () => {
+    const list = byId("admin-version-list");
+    const selected = list.value;
+    try {
+      const versions = readVersionSnapshots();
+      list.replaceChildren();
+      versions.forEach((version, index) => {
+        const option = new Option(
+          `${new Date(version.savedAt).toLocaleString()} — before update`,
+          String(index),
+        );
+        list.append(option);
+      });
+      if (versions.some((_version, index) => String(index) === selected)) list.value = selected;
+      byId("admin-version-restore").disabled = versions.length === 0;
+    } catch (error) {
+      list.replaceChildren(new Option("Version history could not be read", ""));
+      byId("admin-version-restore").disabled = true;
+      setStatus(error.message, "error");
+    }
+  };
+
+  const savePublishedVersion = async () => {
+    const response = await fetch(contentUrl, { cache: "no-store" });
+    if (!response.ok) throw new Error(`Could not read the currently published version (${response.status}).`);
+    const published = await response.json();
+    if (!published || published.version !== 1 || typeof published.edits !== "object") {
+      throw new Error("The currently published content is invalid; publishing was stopped to protect it.");
+    }
+    const versions = readVersionSnapshots();
+    const snapshot = JSON.stringify(published);
+    if (versions[0] && JSON.stringify(versions[0].state) === snapshot) return;
+    versions.unshift({ savedAt: Date.now(), state: published });
+    localStorage.setItem(VERSION_STORAGE_KEY, JSON.stringify(versions.slice(0, 5)));
+    renderVersionList();
+  };
+
+  const restorePublishedVersion = () => {
+    let versions;
+    try {
+      versions = readVersionSnapshots();
+    } catch (error) {
+      setStatus(error.message, "error");
+      return;
+    }
+    const index = Number(byId("admin-version-list").value);
+    const version = versions[index];
+    if (!version) {
+      setStatus("Choose a saved version first.", "error");
+      return;
+    }
+    if (!window.confirm("Load this previous published version as an editable draft? The current published preview will not change.")) return;
+    const previousDraft = JSON.stringify(state);
+    Object.keys(state).forEach((key) => delete state[key]);
+    Object.assign(state, JSON.parse(JSON.stringify(version.state)));
+    state.edits ||= {};
+    state.sections ||= [];
+    state.sectionCopies ||= [];
+    state.sectionOrder ||= [];
+    state.projects ||= [];
+    state.contentBlocks ||= [];
+    state.buttons ||= [];
+    state.mediaElements ||= [];
+    undoHistory = [previousDraft];
+    redoHistory = [];
+    renderEditorState();
+    lastHistorySnapshot = JSON.stringify(state);
+    historyReady = true;
+    window.clearTimeout(draftTimer);
+    if (persistDraft()) {
+      setStatus("Previous version loaded as a saved draft. Publish when you are ready to restore it.", "saved");
+    }
   };
 
   const bindNumberField = (id, styleName) => {
@@ -914,6 +1340,17 @@
     byId("admin-collapse").setAttribute("aria-expanded", String(!collapsed));
     document.body.classList.toggle("cms-administrator-collapsed", collapsed);
   });
+  document.querySelectorAll("[data-preview-mode]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const mode = button.dataset.previewMode;
+      document.body.classList.remove("cms-preview-tablet", "cms-preview-mobile");
+      if (mode === "tablet") document.body.classList.add("cms-preview-tablet");
+      if (mode === "mobile") document.body.classList.add("cms-preview-mobile");
+      document.querySelectorAll("[data-preview-mode]").forEach((option) => {
+        option.setAttribute("aria-pressed", String(option === button));
+      });
+    });
+  });
   textInput.addEventListener("input", () => updateText(textInput.value));
   byId("admin-theme").addEventListener("change", (event) => {
     state.theme = event.currentTarget.value;
@@ -962,9 +1399,16 @@
     if (!selected || !mediaInput.files?.[0]) return;
     try {
       const uploaded = await uploadFile(mediaInput.files[0]);
+      const project = selected instanceof HTMLImageElement ? projectForElement(selected) : null;
       const edit = currentEdit();
       edit.media = uploaded.url;
-      if (selected instanceof HTMLImageElement) selected.src = uploaded.url;
+      if (selected instanceof HTMLImageElement) {
+        selected.src = uploaded.url;
+        if (project) {
+          project.image = uploaded.url;
+          delete edit.media;
+        }
+      }
       if (selected instanceof HTMLVideoElement) {
         selected.src = uploaded.url;
         selected.load();
@@ -990,6 +1434,8 @@
     if (!(selected instanceof HTMLImageElement)) return;
     currentEdit().alt = event.currentTarget.value;
     selected.alt = event.currentTarget.value;
+    const project = projectForElement(selected);
+    if (project) project.alt = event.currentTarget.value;
     saveDraft();
   });
   byId("admin-href").addEventListener("change", (event) => {
@@ -1024,6 +1470,19 @@
     selected.dataset.serviceExample = event.currentTarget.value;
     saveDraft();
   });
+  for (const [id, field] of [
+    ["admin-project-title", "title"],
+    ["admin-project-client", "client"],
+    ["admin-project-location", "location"],
+    ["admin-project-category", "category"],
+    ["admin-project-description", "description"],
+    ["admin-project-role", "role"],
+    ["admin-project-alt", "alt"],
+  ]) {
+    byId(id).addEventListener("input", (event) => updateProjectField(field, event.currentTarget.value));
+    byId(id).addEventListener("change", (event) => updateProjectField(field, event.currentTarget.value));
+  }
+  byId("admin-project-preview").addEventListener("click", previewCaseStudy);
   byId("admin-parent").addEventListener("click", () => {
     const parent = selected?.parentElement?.closest(CANDIDATE_SELECTOR);
     if (parent) selectElement(parent);
@@ -1065,6 +1524,7 @@
     selectionName.textContent = "Hidden element";
     byId("admin-delete").disabled = true;
     saveDraft();
+    renderSectionList();
   });
   byId("admin-restore").addEventListener("click", () => {
     for (const [id, edit] of Object.entries(state.edits)) {
@@ -1074,9 +1534,13 @@
       delete edit.deleted;
     }
     saveDraft();
+    renderSectionList();
     setStatus("Hidden elements restored.");
   });
   byId("admin-add-section").addEventListener("click", addSection);
+  byId("admin-new-section-title").addEventListener("keydown", (event) => {
+    if (event.key === "Enter") addSection();
+  });
   byId("admin-add-project").addEventListener("click", addPortfolioProject);
   byId("admin-add-heading-block").addEventListener("click", () => addTextBlock("heading"));
   byId("admin-add-text-block").addEventListener("click", () => addTextBlock("text"));
@@ -1088,8 +1552,7 @@
   });
   byId("admin-block-up").addEventListener("click", () => moveContentBlock(-1));
   byId("admin-block-down").addEventListener("click", () => moveContentBlock(1));
-  byId("admin-move-up").addEventListener("click", () => moveSelectedSection(-1));
-  byId("admin-move-down").addEventListener("click", () => moveSelectedSection(1));
+  byId("admin-version-restore").addEventListener("click", restorePublishedVersion);
   byId("admin-reset-draft").addEventListener("click", () => {
     if (!window.confirm("Discard your unpublished browser draft and reload the last published website?")) return;
     localStorage.removeItem(STORAGE_KEY);
@@ -1178,6 +1641,7 @@
     setStatus(`Could not load editor data: ${error.message}`, "error");
     throw error;
   });
+  renderVersionList();
   let imageResizeTimer;
   window.addEventListener("resize", () => {
     window.clearTimeout(imageResizeTimer);

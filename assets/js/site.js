@@ -51,6 +51,23 @@
 
   const filterButtons = document.querySelectorAll(".filter-button");
   const emptyMessage = document.querySelector(".portfolio-empty");
+  const portfolioGrid = document.querySelector(".portfolio-grid");
+
+  const openProjectPage = (card) => {
+    if (card?.dataset.projectUrl) window.location.assign(card.dataset.projectUrl);
+  };
+
+  portfolioGrid?.addEventListener("click", (event) => {
+    if (event.target.closest("a,button")) return;
+    openProjectPage(event.target.closest(".project-card[role='link']"));
+  });
+  portfolioGrid?.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    const card = event.target.closest(".project-card[role='link']");
+    if (!card) return;
+    event.preventDefault();
+    openProjectPage(card);
+  });
 
   filterButtons.forEach((button) => {
     button.addEventListener("click", () => {

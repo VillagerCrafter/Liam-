@@ -1,0 +1,85 @@
+---
+layout: null
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#111a16">
+    <meta name="description" content="A project case study from Liam Bennicoff's brand experiences portfolio.">
+    <title>Project case study | {{ site.title | escape }}</title>
+    <link rel="stylesheet" href="{{ '/assets/css/site.css' | relative_url }}">
+    <script id="case-study-config"
+      type="application/json"
+      data-content-url="{{ '/site-content.json' | relative_url }}"
+      data-site-baseurl="{{ site.baseurl | escape }}">{{ site.data.projects | jsonify }}</script>
+    <script src="{{ '/assets/js/case-study.js' | relative_url }}" defer></script>
+  </head>
+  <body class="case-study-page">
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <a class="brand-mark" href="{{ '/' | relative_url }}" aria-label="Liam Bennicoff home">
+        <span class="brand-monogram" aria-hidden="true">LB</span>
+        <span class="brand-name">LIAM BENNICOFF<span>BRAND EXPERIENCES</span></span>
+      </a>
+      <nav class="primary-navigation" aria-label="Main navigation">
+        <a href="{{ '/#services' | relative_url }}">Services</a>
+        <a href="{{ '/#about' | relative_url }}">About</a>
+        <a href="{{ '/#work' | relative_url }}">Portfolio</a>
+        <a href="{{ '/#contact' | relative_url }}">Contact</a>
+        <a class="nav-cta" href="{{ '/#book' | relative_url }}">Book a call <span aria-hidden="true">↗</span></a>
+      </nav>
+    </header>
+    <main id="main">
+      <section class="case-study-hero section-pad" aria-labelledby="case-study-title">
+        <div class="page-width">
+          <a class="case-study-back" href="{{ '/#work' | relative_url }}">← Back to selected work</a>
+          <p class="section-number" id="case-study-client">PROJECT CASE STUDY</p>
+          <h1 id="case-study-title">Loading project…</h1>
+          <p class="case-study-intro" id="case-study-description"></p>
+          <div class="case-study-meta">
+            <span id="case-study-location"></span>
+            <span id="case-study-category"></span>
+          </div>
+          <p class="case-study-preview-notice" id="case-study-preview-notice" hidden>Draft preview — this version has not been published.</p>
+        </div>
+      </section>
+      <section class="case-study-content section-pad" aria-label="Project details">
+        <div class="page-width case-study-layout">
+          <figure class="case-study-image">
+            <img id="case-study-image" src="" alt="" width="1200" height="800">
+          </figure>
+          <div class="case-study-role">
+            <span class="section-number">MY ROLE</span>
+            <p id="case-study-role"></p>
+            <a class="button button-dark" href="{{ '/#book' | relative_url }}">Plan your brand experience <span aria-hidden="true">↗</span></a>
+          </div>
+        </div>
+        <p class="page-width case-study-status" id="case-study-status" role="status" aria-live="polite"></p>
+      </section>
+      <section class="case-study-next section-pad">
+        <div class="page-width">
+          <span class="section-number">HAVE A PROJECT IN MIND?</span>
+          <h2>Let's create a moment <em>worth remembering.</em></h2>
+          <a class="button button-lime" href="{{ '/#contact' | relative_url }}">Start a conversation <span aria-hidden="true">↗</span></a>
+        </div>
+      </section>
+    </main>
+    <footer class="site-footer">
+      <div class="page-width footer-top">
+        <div>
+          <a class="footer-brand" href="{{ '/' | relative_url }}"><span class="brand-monogram" aria-hidden="true">LB</span><span>LIAM BENNICOFF</span></a>
+          <p>Brand experiences with purpose, energy, and a human touch.</p>
+        </div>
+        <div class="footer-socials" aria-label="Social media">
+          {% for social in site.socials %}
+          <a href="{{ social.url }}" target="_blank" rel="noopener noreferrer">{{ social.name }} ↗</a>
+          {% endfor %}
+          <a href="mailto:{{ site.email }}">Email ↗</a>
+        </div>
+      </div>
+      <div class="page-width footer-bottom"><span>© {{ 'now' | date: '%Y' }} Liam Bennicoff</span><a href="{{ '/#work' | relative_url }}">Back to portfolio ↑</a></div>
+    </footer>
+  </body>
+</html>

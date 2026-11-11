@@ -199,7 +199,9 @@ layout: null
         </div>
         <div class="portfolio-grid">
           {% for project in site.data.projects %}
-          <article class="project-card" id="project-{{ project.id }}" data-category="{{ project.category }}">
+          <article class="project-card" id="project-{{ project.id }}" data-category="{{ project.category }}"
+            data-project-url="{{ '/projects/' | relative_url }}?project={{ project.id }}" role="link" tabindex="0"
+            aria-label="View case study: {{ project.title | escape }}">
             <div class="project-image-wrap">
               <img src="{{ project.image | relative_url }}" alt="{{ project.alt | escape }}" loading="lazy" width="1200" height="800">
               <span class="project-index">{{ forloop.index | prepend: '0' }}</span>

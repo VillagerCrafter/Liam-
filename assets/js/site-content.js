@@ -229,6 +229,48 @@
     section.append(element);
   };
 
+  const renderSectionCopies = (copies) => {
+    const root = document.querySelector("main");
+    if (!root || !Array.isArray(copies)) return;
+    copies.forEach((copy) => {
+      if (!copy || !/^section-copy-[\w-]+$/.test(copy.id || "") ||
+          !/^[\w-]+$/.test(copy.sourceId || "") || document.getElementById(copy.id)) return;
+      const source = [...root.querySelectorAll(":scope > section")]
+        .find((section) => section.dataset.cmsId === copy.sourceId);
+      if (!source || source.querySelector("form,iframe,video")) return;
+      const clone = source.cloneNode(true);
+      clone.classList.add("cms-published-addition", "cms-section-copy");
+      clone.id = copy.id;
+      clone.dataset.cmsId = copy.id;
+      clone.hidden = false;
+      const sourceIds = [source, ...source.querySelectorAll("[id]")];
+      const cloneIds = [clone, ...clone.querySelectorAll("[id]")];
+      const idMap = new Map();
+      sourceIds.forEach((sourceNode, index) => {
+        if (sourceNode.id) idMap.set(sourceNode.id, index === 0 ? copy.id : `${copy.id}-item-${index}`);
+      });
+      cloneIds.forEach((cloneNode, index) => {
+        const sourceNode = sourceIds[index];
+        if (sourceNode?.id) cloneNode.id = idMap.get(sourceNode.id);
+      });
+      clone.querySelectorAll("*").forEach((element) => {
+        for (const attribute of ["for", "aria-labelledby", "aria-describedby", "aria-controls", "aria-owns", "headers"]) {
+          const value = element.getAttribute(attribute);
+          if (value) element.setAttribute(attribute, value.split(/\s+/).map((id) => idMap.get(id) || id).join(" "));
+        }
+        const href = element.getAttribute("href");
+        if (href?.startsWith("#") && idMap.has(href.slice(1))) element.setAttribute("href", `#${idMap.get(href.slice(1))}`);
+      });
+      const sourceNodes = [source, ...source.querySelectorAll("[data-cms-id]")];
+      const cloneNodes = [clone, ...clone.querySelectorAll("[data-cms-id]")];
+      sourceNodes.forEach((_sourceNode, index) => {
+        const cloneNode = cloneNodes[index];
+        if (cloneNode) cloneNode.dataset.cmsId = index === 0 ? copy.id : `${copy.id}-element-${index}`;
+      });
+      root.append(clone);
+    });
+  };
+
   const renderProject = (project) => {
     const grid = document.querySelector(".portfolio-grid");
     if (!grid || !project?.id || !project.title || !project.image) return;
@@ -242,6 +284,10 @@
     card.classList.add("cms-published-addition");
     card.id = `project-${project.id}`;
     card.dataset.category = project.category || "activation";
+    card.dataset.projectUrl = `${siteBaseUrl}/projects/?project=${encodeURIComponent(project.id)}`;
+    card.setAttribute("role", "link");
+    card.tabIndex = 0;
+    card.setAttribute("aria-label", `View case study: ${project.title}`);
     card.innerHTML = '<div class="project-image-wrap"><img loading="lazy" width="1200" height="800"><span class="project-index"></span></div><div class="project-meta"><span></span><span></span></div><h3></h3><p class="project-description"></p><p class="project-role"><span>MY ROLE</span></p>';
     card.querySelector("img").src = resolveSitePath(project.image);
     card.querySelector("img").alt = project.alt || project.title;
@@ -312,6 +358,7 @@
 
     const additionIds = new Set([
       ...(content.sections || []).map((section) => section.id),
+      ...(content.sectionCopies || []).map((section) => section.id),
       ...(content.projects || []).map((project) => `project-${project.id}`),
       ...(content.contentBlocks || []).map((block) => block.id),
       ...(content.buttons || []).map((item) => item.id),
@@ -343,6 +390,8 @@
       if (item.credit) renderCredit(image, item.credit, figure);
       section.append(figure);
     });
+    assignContentIds();
+    renderSectionCopies(content.sectionCopies);
     assignContentIds();
 
     Object.entries(content.edits || {}).forEach(([id, edit]) => {

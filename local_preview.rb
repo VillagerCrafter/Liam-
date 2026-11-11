@@ -23,6 +23,13 @@ RelativeUrlFilter = Module.new do
 end
 Liquid::Template.register_filter(RelativeUrlFilter)
 
+JsonifyFilter = Module.new do
+  def jsonify(value)
+    JSON.generate(value)
+  end
+end
+Liquid::Template.register_filter(JsonifyFilter)
+
 def render_site
   config = YAML.load_file(File.join(ROOT, "_config.yml"))
   config["data"] = {
@@ -34,6 +41,11 @@ def render_site
   html = Liquid::Template.parse(source).render!("site" => config)
   FileUtils.mkdir_p(PREVIEW)
   File.write(File.join(PREVIEW, "index.html"), html)
+  project_source = File.read(File.join(ROOT, "projects", "index.html"))
+  project_source = project_source.sub(/\A---\s*\n.*?\n---\s*\n/m, "")
+  project_html = Liquid::Template.parse(project_source).render!("site" => config)
+  FileUtils.mkdir_p(File.join(PREVIEW, "projects"))
+  File.write(File.join(PREVIEW, "projects", "index.html"), project_html)
   FileUtils.cp_r(File.join(ROOT, "assets"), PREVIEW)
   FileUtils.rm_f(File.join(PREVIEW, "assets", "js", "admin.js"))
   FileUtils.rm_f(File.join(PREVIEW, "assets", "js", "admin-enhancements.js"))
@@ -412,6 +424,7 @@ server.mount_proc("/api/") do |request, response|
       unless content.is_a?(Hash) && content["version"] == 1 &&
           content["edits"].is_a?(Hash) && content["sections"].is_a?(Array) &&
           content["sectionOrder"].is_a?(Array) && content["projects"].is_a?(Array) &&
+          (content["sectionCopies"].nil? || content["sectionCopies"].is_a?(Array)) &&
           (content["contentBlocks"].nil? || content["contentBlocks"].is_a?(Array)) &&
           (content["buttons"].nil? || content["buttons"].is_a?(Array)) &&
           (content["mediaElements"].nil? || content["mediaElements"].is_a?(Array)) &&
@@ -424,7 +437,15 @@ server.mount_proc("/api/") do |request, response|
         item.is_a?(Hash) && item["id"].to_s.match?(/\Apage-[\w-]+\z/) &&
           item["title"].is_a?(String) && item["title"].length.between?(1, 160) &&
           item["text"].is_a?(String) && item["text"].length <= 10_000
-      end
+      end && sections.map { |item| item["id"] }.uniq.length == sections.length
+      section_copies = content["sectionCopies"] || []
+      valid_section_copies = section_copies.length <= 100 &&
+        section_copies.all? do |item|
+          item.is_a?(Hash) && item["id"].to_s.match?(/\Asection-copy-[\w-]+\z/) &&
+            item["sourceId"].is_a?(String) && item["sourceId"].match?(/\A[\w-]+\z/) &&
+            item["title"].is_a?(String) && item["title"].length.between?(1, 160)
+        end &&
+        section_copies.map { |item| item["id"] }.uniq.length == section_copies.length
       projects = content["projects"]
       valid_projects = projects.length <= 200 && projects.all? do |item|
         item.is_a?(Hash) && item["id"].to_s.match?(/\Acustom-[\w-]+\z/) &&
@@ -438,7 +459,7 @@ server.mount_proc("/api/") do |request, response|
           item["role"].is_a?(String) && item["role"].length <= 2_000
       end
       section_order = content["sectionOrder"]
-      valid_section_order = section_order.length <= 100 &&
+      valid_section_order = section_order.length <= 300 &&
         section_order.all? { |id| id.is_a?(String) && id.match?(/\A[\w-]+\z/) } &&
         section_order.uniq.length == section_order.length
       edits = content["edits"]
@@ -547,7 +568,7 @@ server.mount_proc("/api/") do |request, response|
         ["Georgia, serif", "Arial, sans-serif"].include?(content["fontFamily"])
       unless valid_sections && valid_projects && valid_section_order && valid_edits &&
           valid_button && valid_media_elements && valid_content_blocks && valid_videos &&
-          valid_font && valid_font_file && valid_theme && valid_font_family
+          valid_font && valid_font_file && valid_theme && valid_font_family && valid_section_copies
         json_response(response, 422, { error: "A button, content block, image element, rotating video, or Google Font setting is invalid." })
         next
       end

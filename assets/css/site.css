@@ -357,3 +357,30 @@ h1 em, h2 em { font-family: Georgia, "Times New Roman", serif; font-weight: 400;
   .project-meta { flex-wrap: wrap; overflow-wrap: anywhere; }
   .custom-cta-group > .button { max-width: 100%; }
 }
+
+.project-card[role="link"] { cursor: pointer; }
+.project-card[role="link"]:focus-visible { outline: 3px solid #6c8c20; outline-offset: 5px; }
+.case-study-hero { padding-top: 156px; background: var(--forest-deep); color: white; }
+.case-study-back { display: inline-block; margin-bottom: 42px; color: var(--lime); font-size: 12px; text-decoration: none; }
+.case-study-hero .section-number { margin-bottom: 20px; color: rgba(255,255,255,.7); }
+.case-study-hero h1 { max-width: 1000px; margin-bottom: 20px; font-size: clamp(42px, 7vw, 82px); line-height: 1.02; }
+.case-study-intro { max-width: 750px; color: rgba(255,255,255,.78); font-size: clamp(16px, 2vw, 20px); line-height: 1.7; }
+.case-study-meta { display: flex; flex-wrap: wrap; gap: 10px 24px; margin-top: 28px; color: var(--lime); font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.case-study-preview-notice { margin-top: 24px; padding: 12px 15px; border: 1px solid rgba(211,239,117,.5); color: var(--lime); font-size: 12px; }
+.case-study-layout { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(230px, .7fr); align-items: start; gap: clamp(28px, 6vw, 80px); }
+.case-study-image { margin: 0; background: var(--paper-light); }
+.case-study-image img { width: 100%; max-height: 760px; aspect-ratio: 1.35; object-fit: cover; }
+.case-study-role { position: sticky; top: 40px; }
+.case-study-role p { margin: 14px 0 28px; font-size: 17px; line-height: 1.8; }
+.case-study-status { margin-top: 24px; color: var(--muted); font-size: 12px; }
+.case-study-next { background: var(--forest); color: white; text-align: center; }
+.case-study-next h2 { max-width: 720px; margin: 16px auto 28px; font-size: clamp(34px, 5vw, 58px); line-height: 1.08; }
+.case-study-next h2 em { color: var(--lime); }
+
+@media (max-width: 680px) {
+  .case-study-hero { padding-top: 122px; }
+  .case-study-back { margin-bottom: 32px; }
+  .case-study-layout { grid-template-columns: minmax(0, 1fr); }
+  .case-study-role { position: static; }
+  .case-study-image img { aspect-ratio: 1.15; }
+}

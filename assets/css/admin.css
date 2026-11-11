@@ -60,6 +60,7 @@ body.cms-administrator.cms-administrator-collapsed .site-header {
 .admin-toolbar.is-collapsed .admin-header-actions { position: fixed; top: 50%; left: 0; transform: translateY(-50%); }
 .admin-toolbar.is-collapsed .admin-header-actions #admin-collapse { width: 34px; min-height: 100px; padding: 8px 4px; background: #101914; color: #d3ef75; writing-mode: vertical-rl; }
 .admin-toolbar * { box-sizing: border-box; }
+.admin-toolbar [hidden] { display: none !important; }
 .admin-toolbar button, .admin-toolbar input, .admin-toolbar select, .admin-toolbar textarea { font: inherit; }
 .admin-toolbar-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid #435146; }
 .admin-header-actions { display: grid; flex: 0 0 auto; justify-items: end; gap: 6px; }
@@ -93,9 +94,27 @@ body.cms-administrator.cms-administrator-collapsed .site-header {
 .admin-toolbar .admin-button-row { display: flex; gap: 7px; }
 .admin-toolbar .admin-button-row > * { flex: 1; text-align: center; }
 .admin-toolbar .admin-font-label { grid-column: 1 / -1; }
+.admin-preview-modes { display: flex; gap: 5px; }
+.admin-preview-modes button { flex: 1; padding-inline: 5px; text-align: center; font-size: 10px; }
+.admin-preview-modes button[aria-pressed="true"] { border-color: #d3ef75; color: #d3ef75; }
+.admin-section-row { display: grid; gap: 5px; padding: 7px 0; border-top: 1px solid #435146; }
+.admin-section-row.is-hidden .admin-section-title { color: #aeb8a9; text-decoration: line-through; }
+.admin-section-title { overflow-wrap: anywhere; color: #f4f2e9; font-size: 10px; font-weight: 650; }
+.admin-section-actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+.admin-toolbar .admin-section-actions button { min-width: 0; min-height: 27px; padding: 4px 3px; text-align: center; font-size: 9px; }
+.admin-toolbar .admin-section-actions .admin-section-delete { color: #ffc0b7; }
 .cms-highlight { outline: 2px solid #d3ef75 !important; outline-offset: 3px !important; }
 .cms-text-editing { outline: 2px solid #82d4ce !important; outline-offset: 3px !important; }
 .cms-new-section { border-top: 1px solid #d3ef75; border-bottom: 1px solid #d3ef75; }
+.cms-section-copy { outline: 1px dashed rgba(23,32,25,.25); outline-offset: -6px; }
+.cms-section-layout-case-study > .cms-added-content-block { max-width: 960px; margin: 20px auto; }
+.cms-section-layout-case-study > .cms-added-heading { margin-top: 30px; }
+.cms-preview-tablet main { width: min(820px, calc(100vw - 278px)); margin-inline: auto; }
+.cms-preview-tablet .site-header { left: max(278px, calc((100vw - 820px + 278px) / 2)); width: min(820px, calc(100vw - 278px)); }
+.cms-preview-tablet .site-footer { width: min(820px, calc(100vw - 278px)); margin-inline: auto; }
+.cms-preview-mobile main { width: min(390px, calc(100vw - 278px)); margin-inline: auto; }
+.cms-preview-mobile .site-header { left: max(278px, calc((100vw - 390px + 278px) / 2)); width: min(390px, calc(100vw - 278px)); }
+.cms-preview-mobile .site-footer { width: min(390px, calc(100vw - 278px)); margin-inline: auto; }
 .admin-toolbar .admin-hint { margin: 0; color: #b7c0b2; font-size: 10px; line-height: 1.55; }
 
 .editor-extensions { display: grid; gap: 12px; }
@@ -159,6 +178,12 @@ body.cms-administrator.cms-administrator-collapsed .site-header {
 @media (max-width: 760px) {
   body.cms-administrator { margin-left: 0; }
   body.cms-administrator .site-header { left: 0; width: 100%; }
+  body.cms-administrator.cms-preview-tablet main { width: min(820px, 100%); }
+  body.cms-administrator.cms-preview-tablet .site-header { left: 0; width: min(820px, 100%); }
+  body.cms-administrator.cms-preview-tablet .site-footer { width: min(820px, 100%); }
+  body.cms-administrator.cms-preview-mobile main { width: min(390px, 100%); }
+  body.cms-administrator.cms-preview-mobile .site-header { left: 0; width: min(390px, 100%); }
+  body.cms-administrator.cms-preview-mobile .site-footer { width: min(390px, 100%); }
   .admin-mark { top: 84px; right: 12px; font-size: 7px; }
   body.cms-administrator { padding-bottom: 48svh; }
   .admin-toolbar { inset: auto 0 0; width: auto; height: min(48svh, 460px); padding: 12px 12px calc(12px + env(safe-area-inset-bottom)); border: 1px solid #53634f; border-bottom: 0; }
