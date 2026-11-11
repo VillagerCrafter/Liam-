@@ -1,0 +1,245 @@
+{
+  "version": 1,
+  "edits": {
+    "element-92-img": {
+      "styles": {
+      },
+      "media": "/uploads/cb33be4e4ecffd92d36cb5570d8db86b.jpg",
+      "resize": {
+        "width": 270,
+        "height": 237,
+        "offsetX": 358,
+        "offsetY": 3437
+      }
+    },
+    "element-155-img": {
+      "styles": {
+      },
+      "media": "/uploads/b6d4e9f015b45ce07cc0cc489f3823d0.jpg",
+      "crop": {
+        "fit": "cover",
+        "x": 41.20880238739126,
+        "y": 43.18665720369056
+      },
+      "resize": {
+        "width": 313,
+        "height": 250,
+        "offsetX": 0,
+        "offsetY": 0
+      }
+    },
+    "element-165-img": {
+      "styles": {
+      },
+      "media": "/uploads/f7f29a614133c34313992c1c73008f87.jpg"
+    },
+    "element-175-img": {
+      "styles": {
+      },
+      "media": "/uploads/a424a939d2ef1a52dedb0e2b8626f209.png",
+      "resize": {
+        "width": 270,
+        "height": 221,
+        "offsetX": 928,
+        "offsetY": 5185
+      }
+    },
+    "element-245-img": {
+      "styles": {
+      },
+      "media": "/uploads/14383f0c67a7ee7651f566a9396e274a.jpg",
+      "resize": {
+        "width": 269,
+        "height": 218
+      }
+    },
+    "element-225-img": {
+      "styles": {
+      },
+      "media": "/uploads/e144a1c0314fd30b9e303e8258d7d2b8.jpg"
+    },
+    "element-235-img": {
+      "styles": {
+      },
+      "deleted": true,
+      "resize": {
+        "width": 40,
+        "height": 30,
+        "offsetX": 1152,
+        "offsetY": 6433
+      }
+    },
+    "element-240-h3": {
+      "styles": {
+      },
+      "deleted": true
+    },
+    "element-241-p": {
+      "styles": {
+      },
+      "deleted": true
+    },
+    "element-242-p": {
+      "styles": {
+      },
+      "deleted": true
+    },
+    "element-238-span": {
+      "styles": {
+      },
+      "deleted": true
+    },
+    "element-239-span": {
+      "styles": {
+      },
+      "deleted": true
+    },
+    "element-236-span": {
+      "styles": {
+      },
+      "deleted": true
+    },
+    "element-234-div": {
+      "styles": {
+      },
+      "deleted": true
+    },
+    "element-233-article": {
+      "styles": {
+      },
+      "deleted": true
+    },
+    "element-257-img": {
+      "styles": {
+      },
+      "media": "/uploads/27701564873ff8a5ef5e5f0dc5a8c3ca.jpg"
+    },
+    "element-85-img": {
+      "styles": {
+      },
+      "media": "/uploads/859f50cd8f2c11c689400bfdafc5a363.jpg",
+      "resize": {
+        "width": 277,
+        "height": 213,
+        "offsetX": 925,
+        "offsetY": 3027
+      }
+    },
+    "element-205-img": {
+      "styles": {
+      },
+      "resize": {
+        "width": 271,
+        "height": 334,
+        "offsetX": 934,
+        "offsetY": 5964
+      }
+    },
+    "element-106-img": {
+      "styles": {
+      },
+      "media": "/uploads/88284351bd3aba2c952ad666ef7026eb.jpg"
+    },
+    "element-195-img": {
+      "styles": {
+      },
+      "media": "/uploads/616ff09dcfbfff7ef3e8d527356168f3.jpg"
+    },
+    "element-328-button": {
+      "styles": {
+      },
+      "text": ""
+    },
+    "element-331-button": {
+      "styles": {
+      },
+      "text": ""
+    },
+    "element-308-img": {
+      "styles": {
+      },
+      "media": "/uploads/068a2b6b6dc944996f2fd4187b1c877f.jpg"
+    },
+    "element-320-img": {
+      "styles": {
+      },
+      "media": "/uploads/0045783bcda41c08f13d866155560d23.jpg"
+    },
+    "element-330-button": {
+      "styles": {
+      },
+      "text": ""
+    },
+    "element-304-img": {
+      "styles": {
+      },
+      "media": "/uploads/205301a2817c38b4742132519e0d273b.jpg"
+    },
+    "element-329-button": {
+      "styles": {
+      },
+      "text": ""
+    },
+    "element-332-button": {
+      "styles": {
+      },
+      "text": ""
+    },
+    "element-333-button": {
+      "styles": {
+      },
+      "text": ""
+    },
+    "element-324-img": {
+      "styles": {
+      },
+      "media": "/uploads/ee76ce6b6dd822c1e6c4691ce0b4b5fb.jpg"
+    },
+    "element-316-img": {
+      "styles": {
+      },
+      "media": "/uploads/1320a7492606e1ba87d59020ad9f71f9.jpg"
+    },
+    "element-185-img": {
+      "styles": {
+      },
+      "media": "/uploads/4f6b4a5d97099ecde3e374d5dc46207e.jpg"
+    },
+    "element-99-img": {
+      "styles": {
+      },
+      "media": "/uploads/ccffdbda5f870bcea2bc094ece5a8294.jpg"
+    },
+    "element-9-a": {
+      "styles": {
+      },
+      "text": "Portfolio"
+    },
+    "element-312-img": {
+      "styles": {
+      },
+      "media": "/uploads/826e0d69a372a0ec7e59faecd34f6a84.jpg"
+    }
+  },
+  "sections": [
+
+  ],
+  "sectionOrder": [
+
+  ],
+  "projects": [
+
+  ],
+  "contentBlocks": [],
+  "buttons": [
+
+  ],
+  "mediaElements": [
+
+  ],
+  "heroVideos": null,
+  "theme": "original",
+  "fontFamily": "inherit",
+  "googleFont": "",
+  "fontFile": null
+}

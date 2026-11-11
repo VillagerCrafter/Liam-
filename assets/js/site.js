@@ -49,7 +49,6 @@
     serviceDialog.querySelector("[data-dialog-book]").addEventListener("click", () => serviceDialog.close());
   }
 
-  const projectCards = Array.from(document.querySelectorAll(".project-card"));
   const filterButtons = document.querySelectorAll(".filter-button");
   const emptyMessage = document.querySelector(".portfolio-empty");
 
@@ -64,7 +63,7 @@
         filterButton.setAttribute("aria-pressed", String(isActive));
       });
 
-      projectCards.forEach((card) => {
+      document.querySelectorAll(".project-card").forEach((card) => {
         const isVisible = filter === "all" || card.dataset.category === filter;
         card.hidden = !isVisible;
         if (isVisible) visibleCount += 1;

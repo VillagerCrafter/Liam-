@@ -12,7 +12,7 @@
   --line: rgba(23, 32, 25, .16);
   --page-width: 1240px;
   --page-gutter: clamp(20px, 5vw, 76px);
-  font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
+  font-family: var(--site-font, "Avenir Next", Avenir, "Segoe UI", sans-serif);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
@@ -297,11 +297,12 @@ h1 em, h2 em { font-family: Georgia, "Times New Roman", serif; font-weight: 400;
   .story-grid { grid-template-columns: 1fr; }
   .story-card { min-height: 245px; }
   .story-index { margin-bottom: 27px; }
-  .services-grid { grid-template-columns: 1fr; gap: 22px; }
+  .services-grid { grid-template-columns: minmax(0, 1fr); gap: 22px; }
   .service-image-wrap { aspect-ratio: 1.5; }
   .plan-step { grid-template-columns: 36px 1fr 20px; gap: 11px; }
   .plan-step h3 { font-size: 19px; }
-  .portfolio-grid { grid-template-columns: 1fr; gap: 30px; }
+  .portfolio-grid { grid-template-columns: minmax(0, 1fr); gap: 30px; }
+  .project-card, .service-card { min-width: 0; }
   .project-image-wrap { aspect-ratio: 1.38; }
   .about-layout { grid-template-columns: 1fr; }
   .about-image-wrap { width: min(100%, 430px); aspect-ratio: 1.05; }
@@ -323,4 +324,36 @@ h1 em, h2 em { font-family: Georgia, "Times New Roman", serif; font-weight: 400;
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
+@keyframes cmsFadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes cmsFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes cmsSpin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes cmsPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+
+.custom-cta-group { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
+.cms-stock-image { max-width: 100%; margin: 24px 0; }
+.cms-stock-image img { display: block; max-width: 100%; height: auto; }
+.cms-added-content-block { max-width: 100%; }
+.cms-added-image { margin: 24px 0; }
+.cms-added-image img { display: block; max-width: 100%; height: auto; object-fit: cover; }
+
+@media (max-width: 680px) {
+  .cms-added-image, .cms-stock-image { width: 100%; }
+  .project-meta { flex-wrap: wrap; overflow-wrap: anywhere; }
+  .custom-cta-group > .button { max-width: 100%; }
 }

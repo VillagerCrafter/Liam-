@@ -21,3 +21,9 @@ exclude:
   - Gemfile.lock
   - README.md
   - LICENSE
+  - Launch-Website-Editor.ps1
+  - local_preview.rb
+  - assets/css/admin.css
+  - assets/js/admin.js
+  - assets/js/admin-enhancements.js
+  - assets/data/google-fonts.json
