@@ -1,19 +1,21 @@
 body.cms-administrator {
-  margin-left: 278px;
+  --admin-sidebar-width: 278px;
+  margin-left: var(--admin-sidebar-width);
 }
 
 body.cms-administrator.cms-administrator-collapsed {
-  margin-left: 33px;
+  --admin-sidebar-width: 33px;
+  margin-left: var(--admin-sidebar-width);
 }
 
 body.cms-administrator .site-header {
-  left: 278px;
-  width: calc(100% - 278px);
+  left: var(--admin-sidebar-width);
+  width: calc(100% - var(--admin-sidebar-width));
 }
 
 body.cms-administrator.cms-administrator-collapsed .site-header {
-  left: 33px;
-  width: calc(100% - 33px);
+  left: var(--admin-sidebar-width);
+  width: calc(100% - var(--admin-sidebar-width));
 }
 
 .admin-mark {
@@ -35,7 +37,7 @@ body.cms-administrator.cms-administrator-collapsed .site-header {
   z-index: 100;
   inset: 0 auto 0 0;
   display: flex;
-  width: 278px;
+  width: var(--admin-sidebar-width, 278px);
   flex-direction: column;
   gap: 12px;
   overflow: auto;
@@ -60,6 +62,12 @@ body.cms-administrator.cms-administrator-collapsed .site-header {
 .admin-toolbar.is-collapsed .admin-header-actions { position: fixed; top: 50%; left: 0; transform: translateY(-50%); }
 .admin-toolbar.is-collapsed .admin-header-actions #admin-collapse { width: 34px; min-height: 100px; padding: 8px 4px; background: #101914; color: #d3ef75; writing-mode: vertical-rl; }
 .admin-toolbar * { box-sizing: border-box; }
+.admin-toolbar { overflow-x: auto; scrollbar-gutter: stable; overscroll-behavior: contain; }
+.admin-toolbar .admin-tool-group { min-width: 300px; }
+.admin-toolbar.is-collapsed .admin-toolbar-header { min-width: 0; }
+.admin-toolbar-resize { position: fixed; z-index: 101; top: 0; bottom: 0; left: calc(var(--admin-sidebar-width, 278px) - 4px); width: 8px; cursor: ew-resize; touch-action: none; }
+.admin-toolbar-resize:hover, .admin-toolbar-resize:focus-visible { background: rgba(211,239,117,.35); outline: none; }
+.admin-toolbar.is-collapsed ~ .admin-toolbar-resize { display: none; }
 .admin-toolbar [hidden] { display: none !important; }
 .admin-toolbar button, .admin-toolbar input, .admin-toolbar select, .admin-toolbar textarea { font: inherit; }
 .admin-toolbar-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid #435146; }
@@ -104,17 +112,19 @@ body.cms-administrator.cms-administrator-collapsed .site-header {
 .admin-toolbar .admin-section-actions button { min-width: 0; min-height: 27px; padding: 4px 3px; text-align: center; font-size: 9px; }
 .admin-toolbar .admin-section-actions .admin-section-delete { color: #ffc0b7; }
 .cms-highlight { outline: 2px solid #d3ef75 !important; outline-offset: 3px !important; }
+.cms-highlight.cms-multi-selected { outline-color: #82d4ce !important; }
+.cms-editor-locked { cursor: not-allowed !important; }
 .cms-text-editing { outline: 2px solid #82d4ce !important; outline-offset: 3px !important; }
 .cms-new-section { border-top: 1px solid #d3ef75; border-bottom: 1px solid #d3ef75; }
 .cms-section-copy { outline: 1px dashed rgba(23,32,25,.25); outline-offset: -6px; }
 .cms-section-layout-case-study > .cms-added-content-block { max-width: 960px; margin: 20px auto; }
 .cms-section-layout-case-study > .cms-added-heading { margin-top: 30px; }
-.cms-preview-tablet main { width: min(820px, calc(100vw - 278px)); margin-inline: auto; }
-.cms-preview-tablet .site-header { left: max(278px, calc((100vw - 820px + 278px) / 2)); width: min(820px, calc(100vw - 278px)); }
-.cms-preview-tablet .site-footer { width: min(820px, calc(100vw - 278px)); margin-inline: auto; }
-.cms-preview-mobile main { width: min(390px, calc(100vw - 278px)); margin-inline: auto; }
-.cms-preview-mobile .site-header { left: max(278px, calc((100vw - 390px + 278px) / 2)); width: min(390px, calc(100vw - 278px)); }
-.cms-preview-mobile .site-footer { width: min(390px, calc(100vw - 278px)); margin-inline: auto; }
+.cms-preview-tablet main { width: min(820px, calc(100vw - var(--admin-sidebar-width, 278px))); margin-inline: auto; }
+.cms-preview-tablet .site-header { left: max(var(--admin-sidebar-width, 278px), calc((100vw - 820px + var(--admin-sidebar-width, 278px)) / 2)); width: min(820px, calc(100vw - var(--admin-sidebar-width, 278px))); }
+.cms-preview-tablet .site-footer { width: min(820px, calc(100vw - var(--admin-sidebar-width, 278px))); margin-inline: auto; }
+.cms-preview-mobile main { width: min(390px, calc(100vw - var(--admin-sidebar-width, 278px))); margin-inline: auto; }
+.cms-preview-mobile .site-header { left: max(var(--admin-sidebar-width, 278px), calc((100vw - 390px + var(--admin-sidebar-width, 278px)) / 2)); width: min(390px, calc(100vw - var(--admin-sidebar-width, 278px))); }
+.cms-preview-mobile .site-footer { width: min(390px, calc(100vw - var(--admin-sidebar-width, 278px))); margin-inline: auto; }
 .admin-toolbar .admin-hint { margin: 0; color: #b7c0b2; font-size: 10px; line-height: 1.55; }
 
 .editor-extensions { display: grid; gap: 12px; }
@@ -176,7 +186,7 @@ body.cms-administrator.cms-administrator-collapsed .site-header {
 .cms-stock-credit a { color: inherit; }
 
 @media (max-width: 760px) {
-  body.cms-administrator { margin-left: 0; }
+  body.cms-administrator { --admin-sidebar-width: 0px; margin-left: 0; }
   body.cms-administrator .site-header { left: 0; width: 100%; }
   body.cms-administrator.cms-preview-tablet main { width: min(820px, 100%); }
   body.cms-administrator.cms-preview-tablet .site-header { left: 0; width: min(820px, 100%); }
@@ -187,6 +197,7 @@ body.cms-administrator.cms-administrator-collapsed .site-header {
   .admin-mark { top: 84px; right: 12px; font-size: 7px; }
   body.cms-administrator { padding-bottom: 48svh; }
   .admin-toolbar { inset: auto 0 0; width: auto; height: min(48svh, 460px); padding: 12px 12px calc(12px + env(safe-area-inset-bottom)); border: 1px solid #53634f; border-bottom: 0; }
+  .admin-toolbar-resize { display: none; }
   .admin-toolbar.is-collapsed { inset: auto 0 0; width: auto; height: 48px; padding: 5px 12px; overflow: hidden; border: 1px solid #53634f; background: #101914; }
   .admin-toolbar.is-collapsed .admin-toolbar-header { align-items: center; }
   .admin-toolbar.is-collapsed .admin-header-actions { position: static; transform: none; }

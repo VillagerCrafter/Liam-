@@ -82,6 +82,11 @@
           <a target="_blank" rel="noopener noreferrer" href="https://unsplash.com/images">Unsplash</a>
           <a target="_blank" rel="noopener noreferrer" href="https://www.pexels.com/">Pexels</a>
         </div>
+        <label for="editor-elements-page">Results page</label>
+        <div class="editor-search-row">
+          <select id="editor-elements-page" aria-label="Free-use image results page"></select>
+          <button type="button" id="editor-elements-more">See more</button>
+        </div>
         <div id="editor-elements-results" class="editor-stock-results" aria-live="polite"></div>
       `, "editor-elements-body")}
     </div>
@@ -671,10 +676,23 @@
 
   const elementsSearch = byId("editor-elements-search");
   const resultsContainer = byId("editor-elements-results");
+  const elementsPage = byId("editor-elements-page");
+  elementsPage.replaceChildren(...Array.from({ length: 99 }, (_value, index) =>
+    new Option(String(index + 1), String(index + 1))));
+  let stockSearchQuery = "";
   const stockSearch = async () => {
     const query = elementsSearch.value.trim();
     if (query.length < 2) {
       status("Enter at least two characters to search Openverse.", "error");
+      return;
+    }
+    if (query !== stockSearchQuery) {
+      stockSearchQuery = query;
+      elementsPage.value = "1";
+    }
+    const page = Number(elementsPage.value);
+    if (!Number.isInteger(page) || page < 1 || page > 99) {
+      status("Choose a results page from 1 to 99.", "error");
       return;
     }
     const encodedQuery = encodeURIComponent(query);
@@ -691,7 +709,7 @@
     const searchButton = byId("editor-elements-search-button");
     setBusy(searchButton, true, "Searching…");
     try {
-      const response = await fetch(`/api/elements?q=${encodeURIComponent(query)}`, { cache: "no-store" });
+      const response = await fetch(`/api/elements?q=${encodeURIComponent(query)}&page=${page}`, { cache: "no-store" });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || `Search failed (${response.status}).`);
       resultsContainer.replaceChildren();
@@ -782,6 +800,18 @@
     }
   };
   byId("editor-elements-search-button").addEventListener("click", stockSearch);
+  elementsPage.addEventListener("change", () => {
+    if (elementsSearch.value.trim().length >= 2) stockSearch();
+  });
+  byId("editor-elements-more").addEventListener("click", () => {
+    const nextPage = Math.min(99, Number(elementsPage.value) + 1);
+    if (nextPage === Number(elementsPage.value)) {
+      status("You are already on the last available results page.", "error");
+      return;
+    }
+    elementsPage.value = String(nextPage);
+    elementsPage.dispatchEvent(new Event("change", { bubbles: true }));
+  });
   elementsSearch.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
       event.preventDefault();

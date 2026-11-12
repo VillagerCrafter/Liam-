@@ -251,8 +251,14 @@ server.mount_proc("/api/") do |request, response|
       json_response(response, 422, { error: "Enter a search term between 2 and 120 characters." })
       next
     end
+    requested_page = request.query["page"].to_s
+    unless requested_page.empty? || requested_page.match?(/\A[1-9]\d{0,1}\z/)
+      json_response(response, 422, { error: "Choose an image results page between 1 and 99." })
+      next
+    end
+    page = requested_page.empty? ? 1 : requested_page.to_i
     begin
-      uri = URI("https://api.openverse.org/v1/images/?#{URI.encode_www_form(q: query, page_size: 12, mature: "false", license: "cc0,pdm,by,by-sa")}")
+      uri = URI("https://api.openverse.org/v1/images/?#{URI.encode_www_form(q: query, page: page, page_size: 12, mature: "false", license: "cc0,pdm,by,by-sa")}")
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl = true
       http.open_timeout = 5
@@ -426,6 +432,7 @@ server.mount_proc("/api/") do |request, response|
           content["sectionOrder"].is_a?(Array) && content["projects"].is_a?(Array) &&
           (content["sectionCopies"].nil? || content["sectionCopies"].is_a?(Array)) &&
           (content["contentBlocks"].nil? || content["contentBlocks"].is_a?(Array)) &&
+          (content["elementCopies"].nil? || content["elementCopies"].is_a?(Array)) &&
           (content["buttons"].nil? || content["buttons"].is_a?(Array)) &&
           (content["mediaElements"].nil? || content["mediaElements"].is_a?(Array)) &&
           (content["heroVideos"].nil? || content["heroVideos"].is_a?(Hash))
@@ -467,7 +474,7 @@ server.mount_proc("/api/") do |request, response|
         next false unless id.match?(/\A[\w-]+\z/) && edit.is_a?(Hash)
 
         styles = edit["styles"]
-        allowed_styles = %w[width height fontSize left top color backgroundColor fontWeight fontStyle textShadow maxWidth fontFamily]
+        allowed_styles = %w[width height fontSize left top zIndex color backgroundColor fontWeight fontStyle textDecoration textAlign filter textShadow maxWidth fontFamily]
         valid_styles = styles.nil? || (
           styles.is_a?(Hash) && styles.length <= 20 &&
           styles.all? do |name, value|
@@ -500,6 +507,14 @@ server.mount_proc("/api/") do |request, response|
         valid_text = %w[text serviceDescription serviceExample alt].all? do |key|
           !edit.key?(key) || (edit[key].is_a?(String) && edit[key].length <= 10_000)
         end
+        valid_editor_state = (!edit.key?("locked") || [true, false].include?(edit["locked"])) &&
+          (!edit.key?("groupId") || edit["groupId"].to_s.match?(/\Agroup-[\w-]+\z/))
+        valid_style_values = styles.nil? || (styles.is_a?(Hash) &&
+          (!styles.key?("zIndex") || (styles["zIndex"].is_a?(Numeric) && styles["zIndex"].finite? && styles["zIndex"].between?(-9999, 9999))) &&
+          (!styles.key?("textDecoration") || styles["textDecoration"] == "underline") &&
+          (!styles.key?("textAlign") || %w[left center right justify].include?(styles["textAlign"])) &&
+          (!styles.key?("filter") || %w[grayscale(1) sepia(1) brightness(1.15) contrast(1.15) none].include?(styles["filter"]))
+        )
         valid_media = !edit.key?("media") || valid_upload?(edit["media"], uploads_path)
         href = edit["href"]
         valid_href = href.nil? || (
@@ -511,7 +526,7 @@ server.mount_proc("/api/") do |request, response|
           src.is_a?(String) && src.match?(%r{\A(?:https://\S+|/(?!/)\S*)\z}i)
         )
         valid_animation = !edit.key?("animation") || %w[none fade float spin pulse slideshow].include?(edit["animation"])
-        valid_styles && valid_resize && valid_crop && valid_slideshow && valid_text &&
+        valid_styles && valid_style_values && valid_editor_state && valid_resize && valid_crop && valid_slideshow && valid_text &&
           valid_media && valid_href && valid_src && valid_animation
       end
       buttons = content["buttons"] || []
@@ -544,6 +559,26 @@ server.mount_proc("/api/") do |request, response|
           item["text"].is_a?(String) && item["text"].length.between?(1, 10_000)
         end
       end
+      element_copies = content["elementCopies"] || []
+      valid_element_copies = element_copies.length <= 100 && element_copies.all? do |item|
+        next false unless item.is_a?(Hash) &&
+          item["id"].to_s.match?(/\Aelement-copy-[\w-]+\z/) &&
+          item["parentId"].to_s.match?(/\A[\w-]+\z/) &&
+          (item["afterId"].nil? || item["afterId"].to_s.match?(/\A[\w-]+\z/)) &&
+          %w[p h2 h3 h4 span a button img].include?(item["tag"])
+
+        if item["tag"] == "img"
+          src = item["src"].to_s
+          valid_source = valid_upload?(src, uploads_path) ||
+            (src.match?(%r{\A/assets/[\w./-]+\z}) && !src.include?("..") &&
+              File.file?(File.join(ROOT, src.delete_prefix("/"))))
+          valid_source && item["alt"].is_a?(String) && item["alt"].length <= 180
+        else
+          item["text"].is_a?(String) && item["text"].length <= 10_000 &&
+            (item["tag"] != "a" || item["href"].nil? ||
+              item["href"].to_s.match?(%r{\A(?:https?://\S+|mailto:\S+|/(?!/)\S*|#[\w-]+)\z}i))
+        end
+      end && element_copies.map { |item| item["id"] }.uniq.length == element_copies.length
       video_settings = content["heroVideos"]
       valid_videos = video_settings.nil? || (
         video_settings.is_a?(Hash) &&
@@ -567,7 +602,7 @@ server.mount_proc("/api/") do |request, response|
       valid_font_family = %w[inherit custom].include?(content["fontFamily"]) ||
         ["Georgia, serif", "Arial, sans-serif"].include?(content["fontFamily"])
       unless valid_sections && valid_projects && valid_section_order && valid_edits &&
-          valid_button && valid_media_elements && valid_content_blocks && valid_videos &&
+          valid_button && valid_media_elements && valid_content_blocks && valid_element_copies && valid_videos &&
           valid_font && valid_font_file && valid_theme && valid_font_family && valid_section_copies
         json_response(response, 422, { error: "A button, content block, image element, rotating video, or Google Font setting is invalid." })
         next

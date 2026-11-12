@@ -145,11 +145,15 @@
       fontSize: (value) => `${Math.max(8, Math.min(160, Number(value)))}px`,
       left: (value) => `${Math.max(-1200, Math.min(1200, Number(value)))}px`,
       top: (value) => `${Math.max(-1200, Math.min(1200, Number(value)))}px`,
+      zIndex: (value) => String(Math.max(-9999, Math.min(9999, Number(value)))),
       color: (value) => /^#[0-9a-f]{3,8}$/i.test(value) ? value : null,
       backgroundColor: (value) => /^#[0-9a-f]{3,8}$/i.test(value) ? value : null,
       fontWeight: (value) => ["400", "600", "700", "800"].includes(String(value)) ? value : null,
       fontStyle: (value) => value === "italic" ? value : null,
+      textDecoration: (value) => value === "underline" ? value : null,
+      textAlign: (value) => ["left", "center", "right", "justify"].includes(value) ? value : null,
       textShadow: (value) => value === "1" ? "0 2px 12px rgba(0,0,0,.38)" : null,
+      filter: (value) => ["grayscale(1)", "sepia(1)", "brightness(1.15)", "contrast(1.15)", "none"].includes(value) ? value : null,
       maxWidth: (value) => value === "none" ? value : null,
       fontFamily: (value) => ["inherit", "Georgia, serif", "Arial, sans-serif", "custom"].includes(value) ? value : null,
     };
@@ -157,7 +161,10 @@
     Object.entries(styles).forEach(([name, value]) => {
       if (!Object.hasOwn(allowed, name)) return;
       const cssValue = allowed[name](value);
-      if (cssValue) element.style[name] = name === "fontFamily" && value === "custom" ? "LiamImportedFont, sans-serif" : cssValue;
+      if (cssValue) {
+        element.style[name] = name === "fontFamily" && value === "custom" ? "LiamImportedFont, sans-serif" : cssValue;
+        if (name === "zIndex" && getComputedStyle(element).position === "static") element.style.position = "relative";
+      }
     });
   };
 
@@ -173,21 +180,17 @@
     frame.style.width = `${width}px`;
     frame.style.height = "auto";
     frame.style.aspectRatio = `${width} / ${height}`;
-    frame.style.maxWidth = "100%";
+    frame.style.maxWidth = "none";
     frame.style.left = "";
     frame.style.top = "";
     frame.style.position = "";
     if (Number.isFinite(Number(dimensions.offsetX)) || Number.isFinite(Number(dimensions.offsetY))) {
-      const bounds = frame.getBoundingClientRect();
-      const parentBounds = frame.parentElement?.getBoundingClientRect();
-      const minOffsetX = parentBounds ? parentBounds.left - bounds.left : -bounds.left;
-      const maxOffsetX = parentBounds
-        ? parentBounds.right - bounds.right
-        : window.innerWidth - bounds.right;
       const offsetX = Number.isFinite(Number(dimensions.offsetX))
-        ? Math.max(minOffsetX, Math.min(maxOffsetX, Number(dimensions.offsetX)))
+        ? Math.max(-20_000, Math.min(20_000, Number(dimensions.offsetX)))
         : 0;
-      const offsetY = Number.isFinite(Number(dimensions.offsetY)) ? Number(dimensions.offsetY) : 0;
+      const offsetY = Number.isFinite(Number(dimensions.offsetY))
+        ? Math.max(-20_000, Math.min(20_000, Number(dimensions.offsetY)))
+        : 0;
       frame.style.left = `${offsetX}px`;
       frame.style.top = `${offsetY}px`;
       if (offsetX || offsetY) frame.style.position = "relative";
@@ -195,12 +198,12 @@
     if (frame !== image) {
       image.style.width = "100%";
       image.style.height = "100%";
-      image.style.maxWidth = "100%";
+      image.style.maxWidth = "none";
     } else {
       image.style.width = `${width}px`;
       image.style.height = "auto";
       image.style.aspectRatio = `${width} / ${height}`;
-      image.style.maxWidth = "100%";
+      image.style.maxWidth = "none";
     }
   };
 
@@ -227,6 +230,35 @@
       return;
     }
     section.append(element);
+  };
+
+  const renderElementCopies = (copies) => {
+    if (!Array.isArray(copies)) return;
+    copies.forEach((copy) => {
+      if (!copy || !/^element-copy-[\w-]+$/.test(copy.id || "") ||
+          !["p", "h2", "h3", "h4", "span", "a", "button", "img"].includes(copy.tag) ||
+          document.getElementById(copy.id)) return;
+      const parent = getContentElement(copy.parentId);
+      if (!parent) return;
+      const element = document.createElement(copy.tag);
+      element.id = copy.id;
+      element.dataset.cmsId = copy.id;
+      element.classList.add("cms-published-addition");
+      if (copy.tag === "img") {
+        if (!/^(?:\/uploads\/[\w.-]+|\/assets\/[\w./-]+)$/.test(copy.src || "") || copy.src.includes("..")) return;
+        element.src = resolveSitePath(copy.src);
+        element.alt = typeof copy.alt === "string" ? copy.alt : "";
+        element.loading = "lazy";
+      } else {
+        element.textContent = typeof copy.text === "string" ? copy.text : "";
+        if (copy.tag === "a" && /^(https?:|mailto:|\/(?!\/)|#)/i.test(copy.href || "")) {
+          element.setAttribute("href", copy.href);
+        }
+      }
+      const after = getContentElement(copy.afterId);
+      if (after) after.after(element);
+      else parent.append(element);
+    });
   };
 
   const renderSectionCopies = (copies) => {
@@ -361,6 +393,7 @@
       ...(content.sectionCopies || []).map((section) => section.id),
       ...(content.projects || []).map((project) => `project-${project.id}`),
       ...(content.contentBlocks || []).map((block) => block.id),
+      ...(content.elementCopies || []).map((copy) => copy.id),
       ...(content.buttons || []).map((item) => item.id),
       ...(content.mediaElements || []).map((item) => item.id),
     ]);
@@ -392,6 +425,8 @@
     });
     assignContentIds();
     renderSectionCopies(content.sectionCopies);
+    assignContentIds();
+    renderElementCopies(content.elementCopies);
     assignContentIds();
 
     Object.entries(content.edits || {}).forEach(([id, edit]) => {

@@ -30,7 +30,7 @@
     <button class="admin-publish" id="admin-publish" type="button">Update website</button>
     <div class="admin-button-row">
       <button id="admin-edit-mode" class="admin-primary" type="button" aria-pressed="true">Edit page</button>
-      <button id="admin-nav-mode" type="button" aria-pressed="false">Navigate</button>
+      <button id="admin-preview-toggle" type="button" aria-pressed="false">Preview draft</button>
     </div>
     <div class="admin-preview-modes" role="group" aria-label="Preview website width">
       <button type="button" data-preview-mode="desktop" aria-pressed="true">Desktop</button>
@@ -88,10 +88,22 @@
       <summary id="admin-selection-label">Selected element</summary>
     <fieldset>
       <div class="admin-full" id="admin-selection-name"><small>Choose something in the page to edit it.</small></div>
+      <div class="admin-button-row admin-full">
+        <button id="admin-duplicate" type="button" disabled>Copy</button>
+        <button id="admin-group" type="button" disabled>Group</button>
+        <button id="admin-lock" type="button" disabled>Lock</button>
+      </div>
+      <div class="admin-button-row admin-full">
+        <button id="admin-send-backward" type="button" disabled>Send backward</button>
+        <button id="admin-bring-forward" type="button" disabled>Bring forward</button>
+      </div>
       ${textBox("Text", "admin-text")}
       <button class="admin-full" id="admin-replace-media" type="button" disabled>Replace image or video</button>
       <label class="admin-full" for="admin-alt">Image description<input id="admin-alt" type="text"></label>
       <label class="admin-full" for="admin-href">Link or embed destination<input id="admin-href" type="url"></label>
+      <label class="admin-full" for="admin-filter">Media filter
+        <select id="admin-filter"><option value="">Original</option><option value="grayscale(1)">Black and white</option><option value="sepia(1)">Sepia</option><option value="brightness(1.15)">Brighter</option><option value="contrast(1.15)">More contrast</option></select>
+      </label>
       <label class="admin-full" for="admin-service-description">Expanded service description<textarea id="admin-service-description"></textarea></label>
       <label class="admin-full" for="admin-service-example">Service example<textarea id="admin-service-example"></textarea></label>
       <fieldset class="admin-full" id="admin-project-fields" hidden>
@@ -134,6 +146,7 @@
       <div class="admin-button-row admin-full">
         <button id="admin-bold" type="button" aria-pressed="false">Bold</button>
         <button id="admin-italic" type="button" aria-pressed="false">Italic</button>
+        <button id="admin-underline" type="button" aria-pressed="false">Underline</button>
         <button id="admin-shadow" type="button" aria-pressed="false">Text shadow</button>
       </div>
     </fieldset>
@@ -160,7 +173,62 @@
     <input id="admin-media-file" type="file" accept="image/*,video/mp4,video/webm" hidden>
     <input id="admin-font-file" type="file" accept=".woff,.woff2,.ttf,.otf,font/woff,font/woff2,font/ttf,font/otf" hidden>
   `;
-  document.body.append(toolbar);
+  const toolbarResize = document.createElement("div");
+  toolbarResize.className = "admin-toolbar-resize";
+  toolbarResize.id = "admin-toolbar-resize";
+  toolbarResize.setAttribute("role", "separator");
+  toolbarResize.setAttribute("aria-label", "Resize editor sidebar");
+  toolbarResize.setAttribute("aria-orientation", "vertical");
+  toolbarResize.setAttribute("tabindex", "0");
+  document.body.append(toolbar, toolbarResize);
+  const sidebarWidthKey = "liam-portfolio-admin-sidebar-width-v1";
+  const setSidebarWidth = (width, persist = false) => {
+    const bounded = Math.max(278, Math.min(640, Math.round(width)));
+    document.body.style.setProperty("--admin-sidebar-width", `${bounded}px`);
+    toolbarResize.setAttribute("aria-valuenow", String(bounded));
+    if (persist) {
+      try {
+        localStorage.setItem(sidebarWidthKey, String(bounded));
+      } catch (error) {
+        const statusNode = document.getElementById("admin-status");
+        if (statusNode) {
+          statusNode.textContent = `Sidebar resized, but its width could not be remembered: ${error.message}`;
+          statusNode.dataset.state = "error";
+        }
+      }
+    }
+  };
+  try {
+    const savedWidth = Number(localStorage.getItem(sidebarWidthKey));
+    if (savedWidth >= 278 && savedWidth <= 640) setSidebarWidth(savedWidth);
+    else setSidebarWidth(278);
+  } catch (error) {
+    setSidebarWidth(278);
+  }
+  let resizePointerId = null;
+  toolbarResize.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0 || window.matchMedia("(max-width: 760px)").matches) return;
+    resizePointerId = event.pointerId;
+    toolbarResize.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  });
+  toolbarResize.addEventListener("pointermove", (event) => {
+    if (resizePointerId !== event.pointerId) return;
+    setSidebarWidth(event.clientX);
+  });
+  const endSidebarResize = (event) => {
+    if (resizePointerId !== event.pointerId) return;
+    resizePointerId = null;
+    setSidebarWidth(event.clientX, true);
+  };
+  toolbarResize.addEventListener("pointerup", endSidebarResize);
+  toolbarResize.addEventListener("pointercancel", endSidebarResize);
+  toolbarResize.addEventListener("keydown", (event) => {
+    if (!["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+    event.preventDefault();
+    const current = Number(toolbarResize.getAttribute("aria-valuenow")) || 278;
+    setSidebarWidth(current + (event.key === "ArrowRight" ? 20 : -20), true);
+  });
   document.body.classList.add("cms-administrator");
 
   const byId = (id) => document.getElementById(id);
@@ -170,8 +238,11 @@
   const fontInput = byId("admin-font-file");
   const selectionName = byId("admin-selection-name");
   const main = document.querySelector("main");
-  let state = { version: 1, edits: {}, sections: [], sectionCopies: [], sectionOrder: [], projects: [], contentBlocks: [], buttons: [], mediaElements: [], heroVideos: null, theme: "original", fontFamily: "inherit", googleFont: "", fontFile: null };
+  let state = { version: 1, edits: {}, sections: [], sectionCopies: [], sectionOrder: [], projects: [], contentBlocks: [], elementCopies: [], buttons: [], mediaElements: [], groups: [], heroVideos: null, theme: "original", fontFamily: "inherit", googleFont: "", fontFile: null };
   let selected = null;
+  const selectedElements = new Set();
+  let elementClipboard = null;
+  let selectionGroupId = null;
   let editMode = true;
   let dragMode = false;
   let draftTimer;
@@ -196,15 +267,21 @@
   };
 
   const applyStyle = (element, styles = {}) => {
-    const numeric = { width: 2400, height: 1800, fontSize: 160, left: 1200, top: 1200 };
+    const numeric = { width: 2400, height: 1800, fontSize: 160, left: 1200, top: 1200, zIndex: 9999 };
     for (const [name, maximum] of Object.entries(numeric)) {
-      if (styles[name] !== undefined) element.style[name] = `${Math.max(name === "left" || name === "top" ? -1200 : 8, Math.min(maximum, Number(styles[name])))}px`;
+      if (styles[name] !== undefined) element.style[name] = name === "zIndex"
+        ? String(Math.max(-9999, Math.min(maximum, Number(styles[name]))))
+        : `${Math.max(name === "left" || name === "top" ? -1200 : 8, Math.min(maximum, Number(styles[name])))}px`;
     }
     if (/^#[0-9a-f]{3,8}$/i.test(styles.color || "")) element.style.color = styles.color;
     if (/^#[0-9a-f]{3,8}$/i.test(styles.backgroundColor || "")) element.style.backgroundColor = styles.backgroundColor;
     if (["400", "600", "700", "800"].includes(String(styles.fontWeight))) element.style.fontWeight = styles.fontWeight;
     if (styles.fontStyle === "italic") element.style.fontStyle = "italic";
+    if (styles.textDecoration === "underline") element.style.textDecoration = "underline";
+    if (["left", "center", "right", "justify"].includes(styles.textAlign)) element.style.textAlign = styles.textAlign;
     if (styles.textShadow === "1") element.style.textShadow = "0 2px 12px rgba(0,0,0,.38)";
+    if (["grayscale(1)", "sepia(1)", "brightness(1.15)", "contrast(1.15)", "none"].includes(styles.filter)) element.style.filter = styles.filter;
+    if (styles.zIndex !== undefined && getComputedStyle(element).position === "static") element.style.position = "relative";
     if (styles.maxWidth === "none") element.style.maxWidth = "none";
     if (["inherit", "Georgia, serif", "Arial, sans-serif", "custom"].includes(styles.fontFamily)) {
       element.style.fontFamily = styles.fontFamily === "custom" ? "LiamImportedFont, sans-serif" : styles.fontFamily;
@@ -322,21 +399,17 @@
     frame.style.width = `${width}px`;
     frame.style.height = "auto";
     frame.style.aspectRatio = `${width} / ${height}`;
-    frame.style.maxWidth = "100%";
+    frame.style.maxWidth = "none";
     frame.style.left = "";
     frame.style.top = "";
     frame.style.position = "";
     if (Number.isFinite(Number(dimensions.offsetX)) || Number.isFinite(Number(dimensions.offsetY))) {
-      const bounds = frame.getBoundingClientRect();
-      const parentBounds = frame.parentElement?.getBoundingClientRect();
-      const minOffsetX = parentBounds ? parentBounds.left - bounds.left : -bounds.left;
-      const maxOffsetX = parentBounds
-        ? parentBounds.right - bounds.right
-        : window.innerWidth - bounds.right;
       const offsetX = Number.isFinite(Number(dimensions.offsetX))
-        ? Math.max(minOffsetX, Math.min(maxOffsetX, Number(dimensions.offsetX)))
+        ? Math.max(-20_000, Math.min(20_000, Number(dimensions.offsetX)))
         : 0;
-      const offsetY = Number.isFinite(Number(dimensions.offsetY)) ? Number(dimensions.offsetY) : 0;
+      const offsetY = Number.isFinite(Number(dimensions.offsetY))
+        ? Math.max(-20_000, Math.min(20_000, Number(dimensions.offsetY)))
+        : 0;
       frame.style.left = `${offsetX}px`;
       frame.style.top = `${offsetY}px`;
       if (offsetX || offsetY) frame.style.position = "relative";
@@ -344,13 +417,33 @@
     if (frame !== image) {
       image.style.width = "100%";
       image.style.height = "100%";
-      image.style.maxWidth = "100%";
+      image.style.maxWidth = "none";
     } else {
       image.style.width = `${width}px`;
       image.style.height = "auto";
       image.style.aspectRatio = `${width} / ${height}`;
-      image.style.maxWidth = "100%";
+      image.style.maxWidth = "none";
     }
+  };
+  const renderElementCopies = () => {
+    (state.elementCopies || []).forEach((copy) => {
+      if (!copy || !/^element-copy-[\w-]+$/.test(copy.id || "") || document.getElementById(copy.id)) return;
+      const parent = document.querySelector(`[data-cms-id="${CSS.escape(copy.parentId || "")}"]`);
+      if (!parent || !["p", "h2", "h3", "h4", "span", "a", "button", "img"].includes(copy.tag)) return;
+      const element = document.createElement(copy.tag);
+      element.id = copy.id;
+      element.dataset.cmsId = copy.id;
+      if (copy.tag === "img") {
+        if (!/^(?:\/uploads\/[\w.-]+|\/assets\/[\w./-]+)$/.test(copy.src || "") || copy.src.includes("..")) return;
+        element.src = copy.src;
+        element.alt = copy.alt || "";
+      } else {
+        element.textContent = copy.text || "";
+        if (copy.tag === "a" && /^(https?:|mailto:|\/(?!\/)|#)/i.test(copy.href || "")) element.href = copy.href;
+      }
+      if (copy.afterId) document.querySelector(`[data-cms-id="${CSS.escape(copy.afterId)}"]`)?.after(element);
+      else parent.append(element);
+    });
   };
   const addContentBlock = (block) => {
     const section = document.getElementById(block.sectionId);
@@ -371,6 +464,52 @@
       element.textContent = block.text || (block.type === "heading" ? "New heading" : "Write your text here.");
     }
     section.append(element);
+  };
+
+  const duplicateSelected = (source = selected) => {
+    if (!source || selectedElements.size > 1) {
+      setStatus("Copy one element at a time. You can group selected elements and move them together.", "error");
+      return null;
+    }
+    if (!source.dataset.cmsId) assignContentIds();
+    const tag = source.tagName.toLowerCase();
+    if (tag === "img" && !/^(?:\/uploads\/[\w.-]+|\/assets\/[\w./-]+)$/.test(source.getAttribute("src") || "")) {
+      setStatus("This image cannot be copied because its media path is not a local site asset.", "error");
+      return null;
+    }
+    if (tag !== "img" && !source.matches(TEXT_SELECTOR)) {
+      setStatus("Copy supports text and local images. Select a text or image element.", "error");
+      return null;
+    }
+    const parent = source.parentElement;
+    if (!parent) return null;
+    if (!parent.dataset.cmsId) assignContentIds();
+    const id = `element-copy-${crypto.randomUUID()}`;
+    const copy = {
+      id,
+      parentId: parent.dataset.cmsId,
+      afterId: source.dataset.cmsId,
+      tag,
+      text: tag === "img" ? "" : source.textContent,
+      src: tag === "img" ? source.getAttribute("src") : "",
+      alt: tag === "img" ? source.alt : "",
+      href: source instanceof HTMLAnchorElement ? source.getAttribute("href") : "",
+    };
+    state.elementCopies.push(copy);
+    renderElementCopies();
+    const clone = document.querySelector(`[data-cms-id="${CSS.escape(id)}"]`);
+    const sourceEdit = JSON.parse(JSON.stringify(state.edits[source.dataset.cmsId] || { styles: {} }));
+    sourceEdit.locked = false;
+    delete sourceEdit.groupId;
+    state.edits[id] = sourceEdit;
+    if (clone) {
+      if (typeof sourceEdit.text === "string" && clone.matches(TEXT_SELECTOR)) clone.textContent = sourceEdit.text;
+      applyStyle(clone, sourceEdit.styles);
+      selectElement(clone);
+    }
+    saveDraft();
+    setStatus("Element copied. The copy is saved in your draft.");
+    return clone;
   };
 
   const captureOriginalPage = () => {
@@ -639,6 +778,7 @@
     });
     state.projects.forEach(addProjectCard);
     state.contentBlocks.forEach(addContentBlock);
+    renderElementCopies();
     assignContentIds();
     appendSectionCopies();
     assignContentIds();
@@ -682,6 +822,7 @@
         applyImageResize(element, edit.resize);
       }
       applyStyle(element, edit.styles);
+      element.classList.toggle("cms-editor-locked", Boolean(edit.locked));
     }
     state.sectionOrder.forEach((id) => {
       const section = document.querySelector(`[data-cms-id="${CSS.escape(id)}"]`);
@@ -693,11 +834,15 @@
     populateBlockTargets();
     extensionRenderer();
     selected?.classList.remove("cms-highlight");
+    selectedElements.forEach((element) => element.classList.remove("cms-highlight", "cms-multi-selected"));
+    selectedElements.clear();
     selected = null;
+    selectionGroupId = null;
     selectionName.innerHTML = "<small>Choose something in the page to edit it.</small>";
     textInput.value = "";
     textInput.disabled = true;
     byId("admin-delete").disabled = true;
+    ["admin-duplicate", "admin-group", "admin-lock", "admin-send-backward", "admin-bring-forward"].forEach((id) => { byId(id).disabled = true; });
   };
 
   const hydrateState = async () => {
@@ -726,6 +871,7 @@
     state.contentBlocks ||= [];
     state.buttons ||= [];
     state.mediaElements ||= [];
+    state.elementCopies ||= [];
     captureOriginalPage();
     renderEditorState();
     lastHistorySnapshot = JSON.stringify(state);
@@ -752,6 +898,7 @@
     state.contentBlocks ||= [];
     state.buttons ||= [];
     state.mediaElements ||= [];
+    state.elementCopies ||= [];
     renderEditorState();
     lastHistorySnapshot = JSON.stringify(state);
     if (selectedId) {
@@ -842,17 +989,41 @@
     }
   };
 
-  const selectElement = (element) => {
+  const selectElement = (element, { toggle = false, preserve = false } = {}) => {
     if (!element || toolbar.contains(element)) return;
-    selected?.classList.remove("cms-highlight");
-    selected = element;
+    if (!preserve && !toggle) {
+      selectedElements.forEach((item) => item.classList.remove("cms-highlight", "cms-multi-selected"));
+      selectedElements.clear();
+    }
+    if (toggle && selectedElements.has(element)) {
+      element.classList.remove("cms-highlight", "cms-multi-selected");
+      selectedElements.delete(element);
+      selected = [...selectedElements].at(-1) || null;
+      if (!selected) {
+        selectionName.textContent = "Choose something in the page to edit it.";
+        byId("admin-delete").disabled = true;
+        ["admin-duplicate", "admin-group", "admin-lock", "admin-send-backward", "admin-bring-forward"].forEach((id) => { byId(id).disabled = true; });
+        return;
+      }
+    } else {
+      selectedElements.add(element);
+      selected = element;
+    }
     if (!selected.dataset.cmsId) assignContentIds();
-    selected.classList.add("cms-highlight");
+    selectedElements.add(selected);
+    selectedElements.forEach((item) => {
+      item.classList.add("cms-highlight");
+      item.classList.toggle("cms-multi-selected", selectedElements.size > 1);
+    });
     const edit = state.edits[selected.dataset.cmsId] || { styles: {} };
-    selectionName.textContent = `${selected.tagName.toLowerCase()}${selected.id ? ` #${selected.id}` : ""}`;
-    byId("admin-selection-label").textContent = "Selected element";
+    selectionGroupId = edit.groupId || null;
+    selectionName.textContent = `${selected.tagName.toLowerCase()}${selected.id ? ` #${selected.id}` : ""}${selectedElements.size > 1 ? ` · ${selectedElements.size} selected` : ""}`;
+    byId("admin-selection-label").textContent = selectedElements.size > 1 ? "Multiple elements selected" : "Selected element";
+    ["admin-duplicate", "admin-group", "admin-lock", "admin-send-backward", "admin-bring-forward"].forEach((id) => { byId(id).disabled = false; });
+    byId("admin-group").textContent = selectionGroupId ? "Ungroup" : "Group";
+    byId("admin-lock").textContent = edit.locked ? "Unlock" : "Lock";
     textInput.value = typeof edit.text === "string" ? edit.text : (selected.matches(TEXT_SELECTOR) ? selected.innerText : "");
-    textInput.disabled = !selected.matches(TEXT_SELECTOR);
+    textInput.disabled = [...selectedElements].some((item) => !item.matches(TEXT_SELECTOR));
     byId("admin-replace-media").disabled = !(selected instanceof HTMLImageElement || selected instanceof HTMLVideoElement);
     byId("admin-alt").disabled = !(selected instanceof HTMLImageElement);
     byId("admin-alt").value = typeof edit.alt === "string" ? edit.alt : (selected instanceof HTMLImageElement ? selected.alt : "");
@@ -884,9 +1055,22 @@
     }
     byId("admin-color").value = edit.styles?.color || "#172019";
     byId("admin-background").value = edit.styles?.backgroundColor || "#f4f2e9";
-    for (const [id, name] of [["admin-bold", "fontWeight"], ["admin-italic", "fontStyle"], ["admin-shadow", "textShadow"]]) {
+    byId("admin-filter").value = edit.styles?.filter || "";
+    for (const [id, name] of [["admin-bold", "fontWeight"], ["admin-italic", "fontStyle"], ["admin-underline", "textDecoration"], ["admin-shadow", "textShadow"]]) {
       byId(id).setAttribute("aria-pressed", String(Boolean(edit.styles?.[name] && edit.styles[name] !== "400")));
     }
+  };
+  const selectionTargets = () => [...selectedElements].filter((element) => element.isConnected);
+  const updateSelectedStyles = (name, value) => {
+    const targets = selectionTargets();
+    targets.forEach((element) => {
+      state.edits[element.dataset.cmsId] ||= { styles: {} };
+      state.edits[element.dataset.cmsId].styles ||= {};
+      if (value === undefined) delete state.edits[element.dataset.cmsId].styles[name];
+      else state.edits[element.dataset.cmsId].styles[name] = value;
+      applyStyle(element, state.edits[element.dataset.cmsId].styles);
+    });
+    if (targets.length) saveDraft();
   };
 
   const addProjectCard = (project) => {
@@ -1025,11 +1209,14 @@
   };
 
   const updateText = (value) => {
-    if (!selected || !selected.matches(TEXT_SELECTOR)) return;
-    const edit = currentEdit();
-    edit.text = value;
-    selected.textContent = value;
-    selected.style.whiteSpace = "pre-line";
+    const targets = selectionTargets().filter((element) => element.matches(TEXT_SELECTOR));
+    if (!targets.length) return;
+    targets.forEach((element) => {
+      state.edits[element.dataset.cmsId] ||= { styles: {} };
+      state.edits[element.dataset.cmsId].text = value;
+      element.textContent = value;
+      element.style.whiteSpace = "pre-line";
+    });
     saveDraft();
   };
 
@@ -1257,6 +1444,33 @@
     byId(id).addEventListener("input", (event) => {
       if (!selected) return;
       const value = event.currentTarget.value;
+      if (selectedElements.size > 1) {
+        selectionTargets().forEach((element) => {
+          const edit = state.edits[element.dataset.cmsId] ||= { styles: {} };
+          if (element instanceof HTMLImageElement && (styleName === "width" || styleName === "height")) {
+            if (value === "") {
+              delete edit.resize;
+              for (const property of ["width", "height", "aspect-ratio", "max-width"]) imageFrameFor(element).style.removeProperty(property);
+            } else {
+              const frame = imageFrameFor(element);
+              const bounds = frame.getBoundingClientRect();
+              edit.resize = {
+                ...(edit.resize || { width: bounds.width, height: bounds.height }),
+                [styleName]: Number(value),
+              };
+              applyImageResize(element, edit.resize);
+            }
+          } else if (value === "") {
+            delete edit.styles[styleName];
+            element.style.removeProperty(styleName.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`));
+          } else {
+            edit.styles[styleName] = Number(value);
+            applyStyle(element, edit.styles);
+          }
+        });
+        saveDraft();
+        return;
+      }
       if (selected instanceof HTMLImageElement && (styleName === "width" || styleName === "height")) {
         const edit = currentEdit();
         if (value === "") {
@@ -1302,7 +1516,8 @@
     if (!element || element.closest(".service-dialog") || element.isContentEditable) return;
     if (element.matches("a,button")) event.preventDefault();
     event.stopPropagation();
-    selectElement(element);
+    if (event.shiftKey) event.preventDefault();
+    selectElement(element, { toggle: event.shiftKey });
     if (event.detail === 2) beginTextEditing(element);
   }, true);
 
@@ -1323,15 +1538,18 @@
   byId("admin-edit-mode").addEventListener("click", () => {
     editMode = true;
     byId("admin-edit-mode").setAttribute("aria-pressed", "true");
-    byId("admin-nav-mode").setAttribute("aria-pressed", "false");
+    byId("admin-preview-toggle").setAttribute("aria-pressed", "false");
+    byId("admin-preview-toggle").textContent = "Preview draft";
     setStatus("Edit mode: select an item or double-click text and media.");
   });
-  byId("admin-nav-mode").addEventListener("click", () => {
-    editMode = false;
-    selected?.classList.remove("cms-highlight");
-    byId("admin-edit-mode").setAttribute("aria-pressed", "false");
-    byId("admin-nav-mode").setAttribute("aria-pressed", "true");
-    setStatus("Navigation mode: links, filters, and interactive controls work normally.");
+  byId("admin-preview-toggle").addEventListener("click", () => {
+    editMode = !editMode;
+    byId("admin-edit-mode").setAttribute("aria-pressed", String(editMode));
+    byId("admin-preview-toggle").setAttribute("aria-pressed", String(!editMode));
+    byId("admin-preview-toggle").textContent = editMode ? "Preview draft" : "Return to editing";
+    if (!editMode) selectedElements.forEach((element) => element.classList.remove("cms-highlight", "cms-multi-selected"));
+    else selectedElements.forEach((element) => element.classList.add("cms-highlight"));
+    setStatus(editMode ? "Editing draft. Preview modes show the current unsaved design." : "Draft preview is active. The public website has not changed.");
   });
   byId("admin-publish").addEventListener("click", publish);
   byId("admin-collapse").addEventListener("click", () => {
@@ -1339,6 +1557,16 @@
     byId("admin-collapse").textContent = collapsed ? "Show tools" : "Hide tools";
     byId("admin-collapse").setAttribute("aria-expanded", String(!collapsed));
     document.body.classList.toggle("cms-administrator-collapsed", collapsed);
+    if (collapsed) document.body.style.setProperty("--admin-sidebar-width", "33px");
+    else {
+      let savedWidth = 278;
+      try {
+        savedWidth = Number(localStorage.getItem(sidebarWidthKey)) || 278;
+      } catch (error) {
+        setStatus(`Could not restore the saved sidebar width: ${error.message}`, "error");
+      }
+      setSidebarWidth(savedWidth);
+    }
   });
   document.querySelectorAll("[data-preview-mode]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -1412,7 +1640,15 @@
       if (selected instanceof HTMLVideoElement) {
         selected.src = uploaded.url;
         selected.load();
-        await selected.play();
+        if (selected.matches(".hero-video")) {
+          state.heroVideos ||= { items: [], interval: 8 };
+          state.heroVideos.items ||= [];
+          if (state.heroVideos.items.length) state.heroVideos.items[0] = uploaded.url;
+          else state.heroVideos.items.push(uploaded.url);
+        }
+        await selected.play().catch((error) => {
+          if (error.name !== "NotAllowedError") throw error;
+        });
       }
       saveDraft();
       setStatus("Media replaced. Select Update website to publish it.");
@@ -1428,8 +1664,9 @@
   bindNumberField("admin-font-size", "fontSize");
   bindNumberField("admin-left", "left");
   bindNumberField("admin-top", "top");
-  byId("admin-color").addEventListener("input", (event) => selected && saveField(currentEdit(), "color", event.currentTarget.value));
-  byId("admin-background").addEventListener("input", (event) => selected && saveField(currentEdit(), "backgroundColor", event.currentTarget.value));
+  byId("admin-color").addEventListener("input", (event) => updateSelectedStyles("color", event.currentTarget.value));
+  byId("admin-background").addEventListener("input", (event) => updateSelectedStyles("backgroundColor", event.currentTarget.value));
+  byId("admin-filter").addEventListener("change", (event) => updateSelectedStyles("filter", event.currentTarget.value || undefined));
   byId("admin-alt").addEventListener("input", (event) => {
     if (!(selected instanceof HTMLImageElement)) return;
     currentEdit().alt = event.currentTarget.value;
@@ -1491,38 +1728,76 @@
   for (const [id, name, value] of [
     ["admin-bold", "fontWeight", "700"],
     ["admin-italic", "fontStyle", "italic"],
+    ["admin-underline", "textDecoration", "underline"],
     ["admin-shadow", "textShadow", "1"],
   ]) {
     byId(id).addEventListener("click", () => {
       if (!selected) return;
-      const edit = currentEdit();
       const active = byId(id).getAttribute("aria-pressed") !== "true";
-      if (active) edit.styles[name] = value;
-      else delete edit.styles[name];
       byId(id).setAttribute("aria-pressed", String(active));
-      applyStyle(selected, edit.styles);
-      saveDraft();
+      updateSelectedStyles(name, active ? value : undefined);
     });
   }
+  byId("admin-duplicate").addEventListener("click", () => duplicateSelected());
+  byId("admin-group").addEventListener("click", () => {
+    const targets = selectionTargets();
+    if (!targets.length) return;
+    const groupId = selectionGroupId || `group-${crypto.randomUUID()}`;
+    targets.forEach((element) => {
+      state.edits[element.dataset.cmsId] ||= { styles: {} };
+      if (selectionGroupId) delete state.edits[element.dataset.cmsId].groupId;
+      else state.edits[element.dataset.cmsId].groupId = groupId;
+    });
+    selectionGroupId = selectionGroupId ? null : groupId;
+    byId("admin-group").textContent = selectionGroupId ? "Ungroup" : "Group";
+    saveDraft();
+    setStatus(selectionGroupId ? "Selected elements grouped for joint movement." : "Selected elements ungrouped.");
+  });
+  byId("admin-lock").addEventListener("click", () => {
+    const targets = selectionTargets();
+    if (!targets.length) return;
+    const lock = !state.edits[selected.dataset.cmsId]?.locked;
+    targets.forEach((element) => {
+      state.edits[element.dataset.cmsId] ||= { styles: {} };
+      state.edits[element.dataset.cmsId].locked = lock;
+      element.classList.toggle("cms-editor-locked", lock);
+    });
+    byId("admin-lock").textContent = lock ? "Unlock" : "Lock";
+    saveDraft();
+    setStatus(lock ? "Selected elements locked against dragging." : "Selected elements unlocked.");
+  });
+  byId("admin-send-backward").addEventListener("click", () => {
+    selectionTargets().forEach((element) => {
+      const current = Number(state.edits[element.dataset.cmsId]?.styles?.zIndex ?? getComputedStyle(element).zIndex) || 0;
+      state.edits[element.dataset.cmsId] ||= { styles: {} };
+      state.edits[element.dataset.cmsId].styles.zIndex = current - 1;
+      applyStyle(element, state.edits[element.dataset.cmsId].styles);
+    });
+    saveDraft();
+  });
+  byId("admin-bring-forward").addEventListener("click", () => {
+    selectionTargets().forEach((element) => {
+      const current = Number(state.edits[element.dataset.cmsId]?.styles?.zIndex ?? getComputedStyle(element).zIndex) || 0;
+      state.edits[element.dataset.cmsId] ||= { styles: {} };
+      state.edits[element.dataset.cmsId].styles.zIndex = current + 1;
+      applyStyle(element, state.edits[element.dataset.cmsId].styles);
+    });
+    saveDraft();
+  });
 
   byId("admin-delete").addEventListener("click", () => {
     if (!selected || selected.tagName === "MAIN") return;
-    const block = selected.closest(".cms-added-content-block");
-    if (block) {
-      state.edits[block.dataset.cmsId] ||= { styles: {} };
-      state.edits[block.dataset.cmsId].deleted = true;
-      block.hidden = true;
-      selected.classList.remove("cms-highlight");
-      selectionName.textContent = "Hidden content block";
-      byId("admin-delete").disabled = true;
-      saveDraft();
-      return;
-    }
-    currentEdit().deleted = true;
-    selected.hidden = true;
-    selected.classList.remove("cms-highlight");
-    selectionName.textContent = "Hidden element";
+    selectionTargets().forEach((element) => {
+      state.edits[element.dataset.cmsId] ||= { styles: {} };
+      state.edits[element.dataset.cmsId].deleted = true;
+      element.hidden = true;
+      element.classList.remove("cms-highlight", "cms-multi-selected");
+    });
+    selectedElements.clear();
+    selectionName.textContent = "Hidden element(s)";
     byId("admin-delete").disabled = true;
+    ["admin-duplicate", "admin-group", "admin-lock", "admin-send-backward", "admin-bring-forward"].forEach((id) => { byId(id).disabled = true; });
+    selected = null;
     saveDraft();
     renderSectionList();
   });
@@ -1566,56 +1841,239 @@
   });
   let dragStart = null;
   document.addEventListener("pointerdown", (event) => {
-    if (!dragMode || !selected || toolbar.contains(event.target) || !selected.contains(event.target)) return;
-    const edit = currentEdit();
-    const target = selected instanceof HTMLImageElement ? imageFrameFor(selected) : selected;
+    if (!editMode || toolbar.contains(event.target) || event.button !== 0) return;
+    const clicked = event.target.closest(CANDIDATE_SELECTOR);
+    if (!clicked || clicked.closest(".service-dialog")) return;
+    if (!selectedElements.has(clicked)) selectElement(clicked, { toggle: event.shiftKey });
+    if (!dragMode || !selectedElements.has(clicked)) return;
+    const clickedEdit = state.edits[clicked.dataset.cmsId] || {};
+    if (clickedEdit.locked) {
+      setStatus("This element is locked. Unlock it before moving.", "error");
+      return;
+    }
+    const clickedGroup = clickedEdit.groupId;
+    const moving = clickedGroup
+      ? selectionTargets().filter((element) => state.edits[element.dataset.cmsId]?.groupId === clickedGroup)
+      : [clicked];
     dragStart = {
       x: event.clientX,
       y: event.clientY,
-      target,
-      left: selected instanceof HTMLImageElement
-        ? Number.parseFloat(target.style.left) || 0
-        : Number(edit.styles.left || 0),
-      top: selected instanceof HTMLImageElement
-        ? Number.parseFloat(target.style.top) || 0
-        : Number(edit.styles.top || 0),
+      items: moving.map((element) => {
+        const edit = state.edits[element.dataset.cmsId] || { styles: {} };
+        const target = element instanceof HTMLImageElement ? imageFrameFor(element) : element;
+        return {
+          element,
+          target,
+          left: element instanceof HTMLImageElement
+            ? Number.parseFloat(target.style.left) || 0
+            : Number(edit.styles?.left || 0),
+          top: element instanceof HTMLImageElement
+            ? Number.parseFloat(target.style.top) || 0
+            : Number(edit.styles?.top || 0),
+        };
+      }),
     };
     event.preventDefault();
   });
   document.addEventListener("pointermove", (event) => {
-    if (!dragStart || !selected) return;
-    const edit = currentEdit();
-    const left = Math.round(dragStart.left + event.clientX - dragStart.x);
-    const top = Math.round(dragStart.top + event.clientY - dragStart.y);
-    if (selected instanceof HTMLImageElement) {
-      const bounds = dragStart.target.getBoundingClientRect();
-      edit.resize = {
-        ...(edit.resize || { width: bounds.width, height: bounds.height }),
-        offsetX: left,
-        offsetY: top,
-      };
-      applyImageResize(selected, edit.resize);
-      edit.resize.offsetX = Number.parseFloat(dragStart.target.style.left) || 0;
-      edit.resize.offsetY = Number.parseFloat(dragStart.target.style.top) || 0;
-    } else {
-      edit.styles.left = left;
-      edit.styles.top = top;
-      applyStyle(selected, edit.styles);
-    }
-    byId("admin-left").value = left;
-    byId("admin-top").value = top;
+    if (!dragStart) return;
+    dragStart.items.forEach(({ element, target, left: startLeft, top: startTop }) => {
+      const edit = state.edits[element.dataset.cmsId] ||= { styles: {} };
+      const left = Math.round(startLeft + event.clientX - dragStart.x);
+      const top = Math.round(startTop + event.clientY - dragStart.y);
+      if (element instanceof HTMLImageElement) {
+        const bounds = target.getBoundingClientRect();
+        edit.resize = {
+          ...(edit.resize || { width: bounds.width, height: bounds.height }),
+          offsetX: left,
+          offsetY: top,
+        };
+        applyImageResize(element, edit.resize);
+      } else {
+        edit.styles.left = left;
+        edit.styles.top = top;
+        applyStyle(element, edit.styles);
+      }
+      if (element === selected) {
+        byId("admin-left").value = left;
+        byId("admin-top").value = top;
+      }
+    });
   });
   document.addEventListener("pointerup", () => {
     if (!dragStart) return;
     dragStart = null;
     saveDraft();
   });
-  document.addEventListener("keydown", (event) => {
-    if ((event.key === "Delete" || event.key === "Backspace") && selected && !toolbar.contains(event.target) && !event.target.isContentEditable) {
+  const handleEditorShortcut = (event) => {
+    const modifier = event.ctrlKey || event.metaKey;
+    const key = event.key.toLowerCase();
+    const typing = event.target.matches("input, textarea, select") || event.target.isContentEditable;
+    if (modifier && key === "s") {
+      event.preventDefault();
+      saveDraft();
+      setStatus("Saving your draft…");
+      return;
+    }
+    if (typing) return;
+    if (modifier && key === "z") {
+      event.preventDefault();
+      event.shiftKey ? moveHistory(redoHistory, undoHistory) : moveHistory(undoHistory, redoHistory);
+      return;
+    }
+    if (modifier && key === "y") {
+      event.preventDefault();
+      moveHistory(redoHistory, undoHistory);
+      return;
+    }
+    if (modifier && key === "delete") {
+      event.preventDefault();
+      const section = selected?.closest("main > section");
+      if (section && (section.classList.contains("cms-new-section") || section.classList.contains("cms-section-copy"))) {
+        deleteAddedSection(section);
+      } else if (section && window.confirm(`Hide "${sectionTitle(section)}" from the published page? You can restore it later.`)) {
+        toggleSectionVisibility(section);
+      }
+      return;
+    }
+    if ((key === "delete" || key === "backspace") && selectedElements.size) {
       event.preventDefault();
       byId("admin-delete").click();
+      return;
     }
-  });
+    if (modifier && key === "a") {
+      event.preventDefault();
+      const candidates = allCandidates().filter((element) => !element.hidden && element.getClientRects().length);
+      selectedElements.forEach((element) => element.classList.remove("cms-highlight", "cms-multi-selected"));
+      selectedElements.clear();
+      candidates.forEach((element) => selectedElements.add(element));
+      selected = candidates.at(-1) || null;
+      if (selected) selectElement(selected, { preserve: true });
+      setStatus(`${selectedElements.size} visible elements selected.`);
+      return;
+    }
+    if (modifier && key === "c") {
+      event.preventDefault();
+      if (selectedElements.size === 1) elementClipboard = selected;
+      else setStatus("Copy one element at a time; multi-element copying is not supported yet.", "error");
+      return;
+    }
+    if (modifier && key === "x") {
+      event.preventDefault();
+      if (selectedElements.size === 1) {
+        elementClipboard = selected;
+        byId("admin-delete").click();
+      } else setStatus("Cut one element at a time.", "error");
+      return;
+    }
+    if (modifier && key === "v") {
+      event.preventDefault();
+      if (elementClipboard) duplicateSelected(elementClipboard);
+      return;
+    }
+    if (modifier && key === "d") {
+      event.preventDefault();
+      duplicateSelected();
+      return;
+    }
+    if (modifier && key === "g") {
+      event.preventDefault();
+      if (selectedElements.size > 1) byId("admin-group").click();
+      else setStatus("Select multiple elements with Shift-click before grouping.", "error");
+      return;
+    }
+    if (modifier && key === "enter") {
+      event.preventDefault();
+      addSection();
+      return;
+    }
+    if (modifier && key === "/") {
+      event.preventDefault();
+      byId("admin-collapse").click();
+      return;
+    }
+    if ((modifier && key === "e") || key === "/") {
+      event.preventDefault();
+      document.getElementById("editor-elements-tab")?.click();
+      document.getElementById("editor-elements-search")?.focus();
+      return;
+    }
+    if (modifier && key === "[" || modifier && key === "]") {
+      event.preventDefault();
+      const amount = event.altKey ? 9999 : 1;
+      updateSelectedStyles("zIndex", key === "]" ? amount : -amount);
+      return;
+    }
+    if (modifier && key === "b") {
+      event.preventDefault();
+      byId("admin-bold").click();
+      return;
+    }
+    if (modifier && key === "i") {
+      event.preventDefault();
+      byId("admin-italic").click();
+      return;
+    }
+    if (modifier && key === "u") {
+      event.preventDefault();
+      byId("admin-underline").click();
+      return;
+    }
+    if (event.shiftKey && modifier && key === "k" && selected?.matches(TEXT_SELECTOR)) {
+      event.preventDefault();
+      selectionTargets().filter((element) => element.matches(TEXT_SELECTOR)).forEach((element) => {
+        const text = element.textContent;
+        state.edits[element.dataset.cmsId] ||= { styles: {} };
+        state.edits[element.dataset.cmsId].text = text === text.toUpperCase() ? text.toLowerCase() : text.toUpperCase();
+        element.textContent = state.edits[element.dataset.cmsId].text;
+      });
+      saveDraft();
+      return;
+    }
+    if (modifier && key === "k") {
+      event.preventDefault();
+      const link = window.prompt("Enter a secure URL, email link, or page anchor:", selected?.getAttribute("href") || "");
+      if (link !== null && selected instanceof HTMLAnchorElement) byId("admin-href").value = link;
+      if (link !== null && selected instanceof HTMLAnchorElement) byId("admin-href").dispatchEvent(new Event("change"));
+      return;
+    }
+    if (event.shiftKey && modifier && ["l", "c", "r"].includes(key)) {
+      event.preventDefault();
+      updateSelectedStyles("textAlign", { l: "left", c: "center", r: "right" }[key]);
+      return;
+    }
+    if (["arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key) && selectedElements.size) {
+      event.preventDefault();
+      const distance = event.shiftKey ? 10 : 1;
+      selectionTargets().forEach((element) => {
+        const edit = state.edits[element.dataset.cmsId] ||= { styles: {} };
+        if (element instanceof HTMLImageElement) {
+          const frame = imageFrameFor(element);
+          const bounds = frame.getBoundingClientRect();
+          edit.resize ||= { width: bounds.width, height: bounds.height };
+          if (key === "arrowleft") edit.resize.offsetX = (edit.resize.offsetX || 0) - distance;
+          if (key === "arrowright") edit.resize.offsetX = (edit.resize.offsetX || 0) + distance;
+          if (key === "arrowup") edit.resize.offsetY = (edit.resize.offsetY || 0) - distance;
+          if (key === "arrowdown") edit.resize.offsetY = (edit.resize.offsetY || 0) + distance;
+          applyImageResize(element, edit.resize);
+        } else {
+          if (key === "arrowleft") edit.styles.left = (edit.styles.left || 0) - distance;
+          if (key === "arrowright") edit.styles.left = (edit.styles.left || 0) + distance;
+          if (key === "arrowup") edit.styles.top = (edit.styles.top || 0) - distance;
+          if (key === "arrowdown") edit.styles.top = (edit.styles.top || 0) + distance;
+          applyStyle(element, edit.styles);
+        }
+      });
+      saveDraft();
+      return;
+    }
+    if (!modifier && key === "t") {
+      addTextBlock("text");
+    } else if (!modifier && ["r", "c", "l", "s"].includes(key)) {
+      setStatus(`The ${key.toUpperCase()} shape shortcut is not available yet. Use Add content to place text or photos.`, "error");
+    }
+  };
+  document.addEventListener("keydown", handleEditorShortcut);
 
   const portfolio = document.querySelector(".portfolio-section");
   const addButton = document.createElement("button");
