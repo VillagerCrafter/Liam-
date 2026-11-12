@@ -27,3 +27,4 @@ exclude:
   - assets/js/admin.js
   - assets/js/admin-enhancements.js
   - assets/data/google-fonts.json
+  - tests

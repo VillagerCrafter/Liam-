@@ -142,7 +142,7 @@
     const allowed = {
       width: (value) => `${Math.max(40, Math.min(2400, Number(value)))}px`,
       height: (value) => `${Math.max(30, Math.min(1800, Number(value)))}px`,
-      fontSize: (value) => `${Math.max(8, Math.min(160, Number(value)))}px`,
+      fontSize: (value) => `${Math.max(8, Math.min(300, Number(value)))}px`,
       left: (value) => `${Math.max(-1200, Math.min(1200, Number(value)))}px`,
       top: (value) => `${Math.max(-1200, Math.min(1200, Number(value)))}px`,
       zIndex: (value) => String(Math.max(-9999, Math.min(9999, Number(value)))),
@@ -168,15 +168,18 @@
     });
   };
 
-  const imageFrameFor = (image) => image.closest(
-    ".service-image-wrap, .project-image-wrap, .about-image-wrap, .featured-image, .dialog-image",
-  ) || image;
-  const applyImageResize = (image, dimensions) => {
-    if (!(image instanceof HTMLImageElement) || !dimensions) return;
+  const imageFrameFor = (media) => {
+    if (media instanceof HTMLVideoElement) return media.closest(".hero") || media;
+    return media?.closest(
+      ".service-image-wrap, .project-image-wrap, .about-image-wrap, .featured-image, .dialog-image",
+    ) || media;
+  };
+  const applyImageResize = (media, dimensions) => {
+    if (!(media instanceof HTMLImageElement || media instanceof HTMLVideoElement) || !dimensions) return;
     const width = Math.max(40, Math.min(2400, Number(dimensions.width) || 0));
     const height = Math.max(30, Math.min(1800, Number(dimensions.height) || 0));
     if (!width || !height) return;
-    const frame = imageFrameFor(image);
+    const frame = imageFrameFor(media);
     frame.style.width = `${width}px`;
     frame.style.height = "auto";
     frame.style.aspectRatio = `${width} / ${height}`;
@@ -195,15 +198,15 @@
       frame.style.top = `${offsetY}px`;
       if (offsetX || offsetY) frame.style.position = "relative";
     }
-    if (frame !== image) {
-      image.style.width = "100%";
-      image.style.height = "100%";
-      image.style.maxWidth = "none";
+    if (frame !== media) {
+      media.style.width = "100%";
+      media.style.height = "100%";
+      media.style.maxWidth = "none";
     } else {
-      image.style.width = `${width}px`;
-      image.style.height = "auto";
-      image.style.aspectRatio = `${width} / ${height}`;
-      image.style.maxWidth = "none";
+      media.style.width = `${width}px`;
+      media.style.height = "auto";
+      media.style.aspectRatio = `${width} / ${height}`;
+      media.style.maxWidth = "none";
     }
   };
 
@@ -454,7 +457,7 @@
       const legacyResize = edit.styles?.width && edit.styles?.height
         ? { width: edit.styles.width, height: edit.styles.height, offsetX: edit.styles.left, offsetY: edit.styles.top }
         : null;
-      if (element instanceof HTMLImageElement && (edit.resize || legacyResize)) {
+      if ((element instanceof HTMLImageElement || element instanceof HTMLVideoElement) && (edit.resize || legacyResize)) {
         applyImageResize(element, edit.resize || legacyResize);
       }
       if (typeof edit.href === "string" && element instanceof HTMLAnchorElement && /^(https?:|mailto:|\/|#)/i.test(edit.href)) {
@@ -476,7 +479,7 @@
         }
       }
       const styles = { ...(edit.styles || {}) };
-      if (element instanceof HTMLImageElement && (edit.resize || legacyResize)) {
+      if ((element instanceof HTMLImageElement || element instanceof HTMLVideoElement) && (edit.resize || legacyResize)) {
         delete styles.width;
         delete styles.height;
         delete styles.maxWidth;
@@ -534,6 +537,20 @@
       const section = getContentElement(id);
       if (section?.tagName === "SECTION") document.querySelector("main")?.append(section);
     });
+    (content.shapes || []).forEach((shape) => {
+      if (!shape || !/^shape-[\w-]+$/.test(shape.id || "")) return;
+      const section = document.getElementById(shape.sectionId) || document.querySelector("main");
+      if (!section || document.getElementById(shape.id)) return;
+      if (!["rectangle", "circle", "line", "note"].includes(shape.kind)) return;
+      const kinds = { rectangle: "div", circle: "div", line: "div", note: "p" };
+      const element = document.createElement(kinds[shape.kind] || "div");
+      element.className = `cms-added-content-block cms-shape cms-shape-${shape.kind} cms-published-addition`;
+      element.id = shape.id;
+      element.dataset.cmsId = shape.id;
+      if (shape.text) element.textContent = shape.text;
+      section.append(element);
+    });
+    assignContentIds();
     (content.buttons || []).forEach((item) => {
       if (!item || !/^custom-cta-[\w-]+$/.test(item.id || "") ||
           !/^(https:\/\/[^\s]+|mailto:[^\s@]+@[^\s@]+|\/(?!\/)[^\s]*|#[\w-]+)$/i.test(item.href || "") ||
@@ -579,6 +596,10 @@
           : null;
         if (image instanceof HTMLImageElement && (edit.resize || legacyResize)) {
           applyImageResize(image, edit.resize || legacyResize);
+        }
+        const video = getContentElement(id);
+        if (video instanceof HTMLVideoElement && (edit.resize || legacyResize)) {
+          applyImageResize(video, edit.resize || legacyResize);
         }
       });
     }, 100);

@@ -435,7 +435,8 @@ server.mount_proc("/api/") do |request, response|
           (content["elementCopies"].nil? || content["elementCopies"].is_a?(Array)) &&
           (content["buttons"].nil? || content["buttons"].is_a?(Array)) &&
           (content["mediaElements"].nil? || content["mediaElements"].is_a?(Array)) &&
-          (content["heroVideos"].nil? || content["heroVideos"].is_a?(Hash))
+          (content["heroVideos"].nil? || content["heroVideos"].is_a?(Hash)) &&
+          (content["shapes"].nil? || content["shapes"].is_a?(Array))
         json_response(response, 422, { error: "The edit data is incomplete or invalid." })
         next
       end
@@ -529,6 +530,14 @@ server.mount_proc("/api/") do |request, response|
         valid_styles && valid_style_values && valid_editor_state && valid_resize && valid_crop && valid_slideshow && valid_text &&
           valid_media && valid_href && valid_src && valid_animation
       end
+      shapes = content["shapes"] || []
+      valid_shapes = shapes.length <= 100 && shapes.all? do |item|
+        next false unless item.is_a?(Hash) && item["id"].to_s.match?(%r{\Ashape-[\w-]+\z}) &&
+          item["sectionId"].to_s.match?(%r{\A[\w-]+\z}) &&
+          %w[rectangle circle line note].include?(item["kind"])
+
+        item["text"].nil? || (item["text"].is_a?(String) && item["text"].length <= 500)
+      end && shapes.map { |item| item["id"] }.uniq.length == shapes.length
       buttons = content["buttons"] || []
       valid_button = buttons.length <= 50 && buttons.all? do |item|
         item.is_a?(Hash) && item["id"].to_s.match?(/\Acustom-cta-[\w-]+\z/) &&
@@ -602,6 +611,7 @@ server.mount_proc("/api/") do |request, response|
       valid_font_family = %w[inherit custom].include?(content["fontFamily"]) ||
         ["Georgia, serif", "Arial, sans-serif"].include?(content["fontFamily"])
       unless valid_sections && valid_projects && valid_section_order && valid_edits &&
+          valid_shapes &&
           valid_button && valid_media_elements && valid_content_blocks && valid_element_copies && valid_videos &&
           valid_font && valid_font_file && valid_theme && valid_font_family && valid_section_copies
         json_response(response, 422, { error: "A button, content block, image element, rotating video, or Google Font setting is invalid." })

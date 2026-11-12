@@ -135,6 +135,9 @@
       ${numberBox("Font size (px)", "admin-font-size")}
       ${numberBox("Move left (px)", "admin-left")}
       ${numberBox("Move down (px)", "admin-top")}
+      <label>Layer order (front +)<input id="admin-z-index" type="number" step="1"></label>
+      <button class="admin-full" id="admin-send-to-front" type="button">Bring to front</button>
+      <button class="admin-full" id="admin-send-to-back" type="button">Send to back</button>
       <button class="admin-full" id="admin-drag" type="button" aria-pressed="false">Drag selected element</button>
     </fieldset>
     </details>
@@ -314,11 +317,11 @@
     }
     lastHistorySnapshot = snapshot;
     window.clearTimeout(draftTimer);
-    draftTimer = window.setTimeout(() => {
-      if (persistDraft()) {
+    if (persistDraft()) {
+      draftTimer = window.setTimeout(() => {
         setStatus("Draft saved in this browser.", "saved");
-      }
-    }, 250);
+      }, 250);
+    }
   };
 
   const saveField = (edit, name, value) => {
@@ -387,15 +390,18 @@
     });
   };
 
-  const imageFrameFor = (image) => image?.closest(
-    ".service-image-wrap, .project-image-wrap, .about-image-wrap, .featured-image, .dialog-image",
-  ) || image;
-  const applyImageResize = (image, dimensions) => {
-    if (!(image instanceof HTMLImageElement) || !dimensions) return;
+  const imageFrameFor = (media) => {
+    if (media instanceof HTMLVideoElement) return media.closest(".hero") || media;
+    return media?.closest(
+      ".service-image-wrap, .project-image-wrap, .about-image-wrap, .featured-image, .dialog-image",
+    ) || media;
+  };
+  const applyImageResize = (media, dimensions) => {
+    if (!(media instanceof HTMLImageElement || media instanceof HTMLVideoElement) || !dimensions) return;
     const width = Math.max(40, Math.min(2400, Number(dimensions.width) || 0));
     const height = Math.max(30, Math.min(1800, Number(dimensions.height) || 0));
     if (!width || !height) return;
-    const frame = imageFrameFor(image);
+    const frame = imageFrameFor(media);
     frame.style.width = `${width}px`;
     frame.style.height = "auto";
     frame.style.aspectRatio = `${width} / ${height}`;
@@ -414,15 +420,15 @@
       frame.style.top = `${offsetY}px`;
       if (offsetX || offsetY) frame.style.position = "relative";
     }
-    if (frame !== image) {
-      image.style.width = "100%";
-      image.style.height = "100%";
-      image.style.maxWidth = "none";
+    if (frame !== media) {
+      media.style.width = "100%";
+      media.style.height = "100%";
+      media.style.maxWidth = "none";
     } else {
-      image.style.width = `${width}px`;
-      image.style.height = "auto";
-      image.style.aspectRatio = `${width} / ${height}`;
-      image.style.maxWidth = "none";
+      media.style.width = `${width}px`;
+      media.style.height = "auto";
+      media.style.aspectRatio = `${width} / ${height}`;
+      media.style.maxWidth = "none";
     }
   };
   const renderElementCopies = () => {
@@ -537,13 +543,15 @@
         else element.setAttribute(attribute, value);
       }
       if (original.hidden) element.setAttribute("hidden", "");
-      else element.removeAttribute("hidden");
+      else {
+        element.removeAttribute("hidden");
+        element.hidden = false;
+      }
       for (const [name, value] of [["serviceImage", original.serviceImage], ["serviceDescription", original.serviceDescription], ["serviceExample", original.serviceExample]]) {
         if (value === undefined) delete element.dataset[name];
         else element.dataset[name] = value;
       }
     });
-    main.querySelectorAll(".cms-new-section, .cms-section-copy, .cms-published-addition, .cms-added-content-block, .cms-stock-image, .custom-cta-group, .project-card[id^='project-custom-']").forEach((element) => element.remove());
     originalSections.forEach((section) => main.append(section));
     document.querySelectorAll(".cms-stock-credit").forEach((caption) => caption.remove());
   };
@@ -758,6 +766,7 @@
 
   const renderEditorState = () => {
     restoreOriginalPage();
+    assignContentIds();
     state.sections.forEach((section) => {
       if (document.getElementById(section.id)) return;
       const node = document.createElement("section");
@@ -778,6 +787,7 @@
     });
     state.projects.forEach(addProjectCard);
     state.contentBlocks.forEach(addContentBlock);
+    (state.shapes || []).forEach(renderShape);
     renderElementCopies();
     assignContentIds();
     appendSectionCopies();
@@ -872,6 +882,7 @@
     state.buttons ||= [];
     state.mediaElements ||= [];
     state.elementCopies ||= [];
+    state.shapes ||= [];
     captureOriginalPage();
     renderEditorState();
     lastHistorySnapshot = JSON.stringify(state);
@@ -1050,7 +1061,7 @@
     }
     byId("admin-parent").disabled = !selected.parentElement?.matches(CANDIDATE_SELECTOR);
     byId("admin-delete").disabled = selected.tagName === "MAIN";
-    for (const [id, name] of [["admin-width", "width"], ["admin-height", "height"], ["admin-font-size", "fontSize"], ["admin-left", "left"], ["admin-top", "top"]]) {
+    for (const [id, name] of [["admin-width", "width"], ["admin-height", "height"], ["admin-font-size", "fontSize"], ["admin-left", "left"], ["admin-top", "top"], ["admin-z-index", "zIndex"]]) {
       byId(id).value = (name === "width" || name === "height" ? edit.resize?.[name] : undefined) ?? edit.styles?.[name] ?? "";
     }
     byId("admin-color").value = edit.styles?.color || "#172019";
@@ -1201,6 +1212,22 @@
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || `Upload failed (${response.status}).`);
     return result;
+  };
+
+  const resizeSelectedMedia = (dimension, value) => {
+    const targets = selectionTargets().filter((element) => element instanceof HTMLImageElement || element instanceof HTMLVideoElement);
+    if (!targets.length) return;
+    targets.forEach((element) => {
+      const edit = state.edits[element.dataset.cmsId] ||= { styles: {} };
+      const frame = imageFrameFor(element);
+      const bounds = frame.getBoundingClientRect();
+      edit.resize = {
+        ...(edit.resize || { width: bounds.width, height: bounds.height }),
+        [dimension]: value,
+      };
+      applyImageResize(element, edit.resize);
+    });
+    saveDraft();
   };
 
   const requestMedia = (kind) => {
@@ -1447,18 +1474,13 @@
       if (selectedElements.size > 1) {
         selectionTargets().forEach((element) => {
           const edit = state.edits[element.dataset.cmsId] ||= { styles: {} };
-          if (element instanceof HTMLImageElement && (styleName === "width" || styleName === "height")) {
+          if ((element instanceof HTMLImageElement || element instanceof HTMLVideoElement) && (styleName === "width" || styleName === "height")) {
             if (value === "") {
               delete edit.resize;
               for (const property of ["width", "height", "aspect-ratio", "max-width"]) imageFrameFor(element).style.removeProperty(property);
             } else {
-              const frame = imageFrameFor(element);
-              const bounds = frame.getBoundingClientRect();
-              edit.resize = {
-                ...(edit.resize || { width: bounds.width, height: bounds.height }),
-                [styleName]: Number(value),
-              };
-              applyImageResize(element, edit.resize);
+              resizeSelectedMedia(styleName, Number(value));
+              return;
             }
           } else if (value === "") {
             delete edit.styles[styleName];
@@ -1471,7 +1493,7 @@
         saveDraft();
         return;
       }
-      if (selected instanceof HTMLImageElement && (styleName === "width" || styleName === "height")) {
+      if ((selected instanceof HTMLImageElement || selected instanceof HTMLVideoElement) && (styleName === "width" || styleName === "height")) {
         const edit = currentEdit();
         if (value === "") {
           const frame = imageFrameFor(selected);
@@ -1488,14 +1510,10 @@
           saveDraft();
           return;
         }
-        const frame = imageFrameFor(selected);
-        const bounds = frame.getBoundingClientRect();
-        const dimensions = { ...(edit.resize || { width: bounds.width, height: bounds.height }), [styleName]: Number(value) };
-        edit.resize = dimensions;
-        applyImageResize(selected, dimensions);
-        byId("admin-width").value = Math.round(dimensions.width);
-        byId("admin-height").value = Math.round(dimensions.height);
-        saveDraft();
+        resizeSelectedMedia(styleName, Number(value));
+        const updated = currentEdit().resize;
+        byId("admin-width").value = Math.round(updated?.width || 0);
+        byId("admin-height").value = Math.round(updated?.height || 0);
         return;
       }
       if (value === "") {
@@ -1664,6 +1682,9 @@
   bindNumberField("admin-font-size", "fontSize");
   bindNumberField("admin-left", "left");
   bindNumberField("admin-top", "top");
+  bindNumberField("admin-z-index", "zIndex");
+  byId("admin-send-to-front").addEventListener("click", () => updateSelectedStyles("zIndex", 9999));
+  byId("admin-send-to-back").addEventListener("click", () => updateSelectedStyles("zIndex", -9999));
   byId("admin-color").addEventListener("input", (event) => updateSelectedStyles("color", event.currentTarget.value));
   byId("admin-background").addEventListener("input", (event) => updateSelectedStyles("backgroundColor", event.currentTarget.value));
   byId("admin-filter").addEventListener("change", (event) => updateSelectedStyles("filter", event.currentTarget.value || undefined));
@@ -1837,7 +1858,7 @@
   byId("admin-drag").addEventListener("click", () => {
     dragMode = !dragMode;
     byId("admin-drag").setAttribute("aria-pressed", String(dragMode));
-    setStatus(dragMode ? "Drag mode: drag the selected item to reposition it." : "Drag mode is off.");
+    setStatus("Every selected element can already be dragged directly. Alt-drag creates a copy; this toggle is kept for compatibility.");
   });
   let dragStart = null;
   document.addEventListener("pointerdown", (event) => {
@@ -1845,7 +1866,7 @@
     const clicked = event.target.closest(CANDIDATE_SELECTOR);
     if (!clicked || clicked.closest(".service-dialog")) return;
     if (!selectedElements.has(clicked)) selectElement(clicked, { toggle: event.shiftKey });
-    if (!dragMode || !selectedElements.has(clicked)) return;
+    if (!selectedElements.has(clicked)) return;
     const clickedEdit = state.edits[clicked.dataset.cmsId] || {};
     if (clickedEdit.locked) {
       setStatus("This element is locked. Unlock it before moving.", "error");
@@ -1941,6 +1962,62 @@
       byId("admin-delete").click();
       return;
     }
+    if (modifier && event.shiftKey && key === "g") {
+      event.preventDefault();
+      if (selectionGroupId) byId("admin-group").click();
+      else setStatus("Select a grouped element first to ungroup it.", "error");
+      return;
+    }
+    if (modifier && (key === "[" || key === "]")) {
+      event.preventDefault();
+      const amount = event.altKey ? 9999 : 1;
+      updateSelectedStyles("zIndex", key === "]" ? amount : -amount);
+      return;
+    }
+    if (event.shiftKey && modifier && [">", "."].includes(key)) {
+      event.preventDefault();
+      const field = byId("admin-font-size");
+      field.value = String((Number(field.value) || 16) + 2);
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+      return;
+    }
+    if (event.shiftKey && modifier && ["<", ","].includes(key)) {
+      event.preventDefault();
+      const field = byId("admin-font-size");
+      field.value = String(Math.max(8, (Number(field.value) || 16) - 2));
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+      return;
+    }
+    if (event.shiftKey && modifier && key === "8") {
+      event.preventDefault();
+      updateSelectedStyles("whiteSpace", undefined);
+      if (selected?.matches(TEXT_SELECTOR)) {
+        const edit = currentEdit();
+        edit.text = selected.textContent
+          .split(/\s*\n\s*/).filter(Boolean).map((line) => `• ${line.trim()}`).join("\n");
+        selected.textContent = edit.text;
+        selected.style.whiteSpace = "pre-line";
+      }
+      saveDraft();
+      return;
+    }
+    if (event.altKey && event.shiftKey && key === "t" && selectedElements.size > 1) {
+      event.preventDefault();
+      const targets = selectionTargets();
+      const lefts = targets.map((element) => Number(state.edits[element.dataset.cmsId]?.styles?.left || 0));
+      const tops = targets.map((element) => Number(state.edits[element.dataset.cmsId]?.styles?.top || 0));
+      const avgLeft = Math.round(lefts.reduce((sum, value) => sum + value, 0) / targets.length);
+      const avgTop = Math.round(tops.reduce((sum, value) => sum + value, 0) / targets.length);
+      targets.forEach((element) => {
+        state.edits[element.dataset.cmsId] ||= { styles: {} };
+        state.edits[element.dataset.cmsId].styles.left = avgLeft;
+        state.edits[element.dataset.cmsId].styles.top = avgTop;
+        applyStyle(element, state.edits[element.dataset.cmsId].styles);
+      });
+      saveDraft();
+      setStatus("Selected elements tidied to a shared position.");
+      return;
+    }
     if (modifier && key === "a") {
       event.preventDefault();
       const candidates = allCandidates().filter((element) => !element.hidden && element.getClientRects().length);
@@ -1996,12 +2073,6 @@
       event.preventDefault();
       document.getElementById("editor-elements-tab")?.click();
       document.getElementById("editor-elements-search")?.focus();
-      return;
-    }
-    if (modifier && key === "[" || modifier && key === "]") {
-      event.preventDefault();
-      const amount = event.altKey ? 9999 : 1;
-      updateSelectedStyles("zIndex", key === "]" ? amount : -amount);
       return;
     }
     if (modifier && key === "b") {
@@ -2070,8 +2141,47 @@
     if (!modifier && key === "t") {
       addTextBlock("text");
     } else if (!modifier && ["r", "c", "l", "s"].includes(key)) {
-      setStatus(`The ${key.toUpperCase()} shape shortcut is not available yet. Use Add content to place text or photos.`, "error");
+      addShape(key);
     }
+  };
+
+  const renderShape = (shape) => {
+    const section = document.getElementById(shape.sectionId) || document.querySelector("main");
+    if (!section || document.getElementById(shape.id)) return;
+    const kinds = { rectangle: "div", circle: "div", line: "div", note: "p" };
+    const element = document.createElement(kinds[shape.kind] || "div");
+    element.className = `cms-added-content-block cms-shape cms-shape-${shape.kind}`;
+    element.id = shape.id;
+    element.dataset.cmsId = shape.id;
+    if (shape.text) element.textContent = shape.text;
+    section.append(element);
+  };
+
+  const addShape = (kind) => {
+    const section = selected?.closest("main > section") || document.querySelector("main > section");
+    if (!section) return;
+    const shape = {
+      id: `shape-${crypto.randomUUID()}`,
+      sectionId: section.id || "home",
+      kind: kind === "s" ? "note" : { r: "rectangle", c: "circle", l: "line" }[kind] || "rectangle",
+      text: kind === "s" ? "Sticky note" : "",
+    };
+    state.shapes ||= [];
+    if (state.shapes.length >= 100) {
+      setStatus("The page supports up to 100 added shapes.", "error");
+      return;
+    }
+    state.shapes.push(shape);
+    renderShape(shape);
+    assignContentIds();
+    const element = document.getElementById(shape.id);
+    if (element) {
+      selectElement(element);
+      scrollToSection(element);
+    }
+    saveDraft();
+    setStatus({ rectangle: "Rectangle", circle: "Circle", line: "Line", note: "Sticky note" }[shape.kind] +
+      " added. Drag it anywhere; select Update website to publish it.");
   };
   document.addEventListener("keydown", handleEditorShortcut);
 
