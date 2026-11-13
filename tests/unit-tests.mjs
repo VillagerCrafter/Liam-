@@ -796,6 +796,66 @@ test("sidebar toggle shortcut collapses the toolbar", async () => {
   assert.equal(collapse.textContent, "Hide tools");
 });
 
+test("dragging a text element writes visible left/top styles (free movement fix)", async () => {
+  buildPage();
+  const editor = await loadEditor();
+  const heading = document.querySelector("#about h2");
+  editor.selectElement(heading);
+  const left = editor.byId("admin-left");
+  left.value = "200";
+  left.dispatchEvent(new Event("input"));
+  const edit = editor.state.edits[heading.dataset.cmsId];
+  assert.equal(edit.styles.left, 200);
+  editor.applyStyle(heading, edit.styles);
+  assert.equal(heading.style.position, "relative", "element becomes position:relative so left/top take effect");
+  assert.equal(heading.style.left, "200px");
+});
+
+test("snap controls enable for media and stay disabled otherwise", async () => {
+  buildPage();
+  const editor = await loadEditor();
+  const heading = document.querySelector("#about h2");
+  editor.selectElement(heading);
+  assert.equal(editor.byId("admin-snap-even").disabled, true, "even spacing needs two media elements");
+  assert.equal(editor.byId("admin-snap-section").disabled, true, "section snap needs one media element");
+  const image = document.querySelector("img");
+  editor.selectElement(image);
+  assert.equal(editor.byId("admin-snap-section").disabled, false, "one image enables section snap");
+  assert.equal(editor.byId("admin-snap-even").disabled, true, "even spacing still needs a second image");
+  const image2 = document.createElement("img");
+  image2.src = "/assets/images/b.jpg";
+  image2.className = "project-shot";
+  document.querySelector("#about").append(image2);
+  editor.assignContentIds();
+  editor.selectElement(image2, { toggle: true });
+  assert.equal(editor.byId("admin-snap-even").disabled, false, "two images enable even spacing");
+});
+
+test("toolbar badge is a clickable restore control", async () => {
+  buildPage();
+  const editor = await loadEditor();
+  editor.byId("admin-collapse").click();
+  assert.equal(editor.byId("admin-collapse").textContent, "Show tools");
+  const mark = document.querySelector(".admin-mark");
+  assert.ok(mark, "administrator badge exists in the page");
+  assert.equal(mark.getAttribute("role"), "button", "badge is keyboard/click reachable");
+  mark.click();
+  assert.equal(editor.byId("admin-collapse").textContent, "Hide tools", "badge click restores the toolbar");
+});
+
+test("missing-image fallback marks broken sources for the replace hint", () => {
+  const source = readFileSync(path.join(ROOT, "assets", "js", "site-content.js"), "utf8");
+  assert.ok(source.includes("cms-image-missing"), "broken-image class exists in the public renderer");
+  const styles = readFileSync(path.join(ROOT, "assets", "css", "site.css"), "utf8");
+  assert.ok(styles.includes("double-click to replace"), "frame fallback shows a replace hint");
+});
+
+test("narrow-screen fallback overrides dragged positions", () => {
+  const styles = readFileSync(path.join(ROOT, "assets", "css", "site.css"), "utf8");
+  assert.ok(styles.includes("position: static !important"), "dragged elements return to flow on mobile");
+  assert.ok(styles.includes("overflow-wrap: anywhere"), "text wraps instead of clipping");
+});
+
 test("grouped elements move together", async () => {
   buildPage();
   const editor = await loadEditor();

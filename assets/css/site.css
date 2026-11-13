@@ -165,6 +165,34 @@ h1 em, h2 em { font-family: Georgia, "Times New Roman", serif; font-weight: 400;
 .project-image-wrap img { width: 100%; height: 100%; object-fit: cover; transition: transform .45s ease; }
 .project-card:hover .project-image-wrap img { transform: scale(1.035); }
 .project-index { position: absolute; right: 12px; bottom: 12px; display: grid; width: 30px; height: 30px; place-items: center; border-radius: 50%; background: var(--lime); font-size: 10px; font-weight: 700; }
+
+/* Broken or missing image fallback: the frame stays clickable/replaceable. */
+.project-image-wrap img[loading]:not([src]),
+img.cms-image-missing { display: none; }
+.project-image-wrap, .service-image-wrap, .about-image-wrap, .featured-image, .dialog-image { position: relative; }
+.project-image-wrap::before,
+.service-image-wrap::before,
+.about-image-wrap::before,
+.featured-image::before,
+.dialog-image::before {
+content: "Photo — double-click to replace";
+position: absolute;
+inset: 0;
+display: grid;
+place-items: center;
+color: #6c7368;
+font: 600 12px/1.4 "Segoe UI", sans-serif;
+letter-spacing: .04em;
+pointer-events: none;
+}
+.project-image-wrap img:not([src]) ~ .project-index,
+.service-image-wrap img:not([src]) ~ .service-image-action { z-index: 1; }
+.project-image-wrap:has(img[src])::before,
+.service-image-wrap:has(img[src])::before,
+.about-image-wrap:has(img[src])::before,
+.featured-image:has(img[src])::before,
+.dialog-image:has(img[src])::before { content: none; }
+img.cms-image-missing + .project-index { z-index: 1; }
 .project-meta { display: flex; justify-content: space-between; gap: 10px; margin-top: 17px; color: #70766d; font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
 .project-card h3 { margin: 9px 0 7px; font-size: 22px; line-height: 1.15; }
 .project-description { margin: 0; color: #6c7369; font-size: 12px; line-height: 1.7; }
@@ -320,6 +348,40 @@ h1 em, h2 em { font-family: Georgia, "Times New Roman", serif; font-weight: 400;
   .footer-bottom { flex-wrap: wrap; }
   .footer-bottom span:last-child { flex-basis: 100%; }
   .dialog-image { height: 190px; }
+}
+
+/* Narrow screens: dragged/absolutely-positioned edits fall back into the flow
+   so nothing overlaps text or runs off-screen. */
+@media (max-width: 680px) {
+  main [style*="position: relative"],
+  main img[style*="left"],
+  main video[style*="left"] {
+    position: static !important;
+    left: 0 !important;
+    top: 0 !important;
+    max-width: 100% !important;
+    width: auto !important;
+    margin-inline: auto;
+  }
+  main img, main video, .cms-added-image, .cms-stock-image,
+  .project-image-wrap, .service-image-wrap, .about-image-wrap, .featured-image {
+    max-width: 100% !important;
+  }
+  .hero-video { position: absolute; }
+  .hero-shade { position: absolute; }
+  .site-header .brand-name { max-width: 42vw; overflow-wrap: anywhere; }
+  p, h1, h2, h3, h4, .project-description, .step-copy, .service-summary {
+    overflow-wrap: anywhere;
+    min-width: 0;
+  }
+  main > section, .page-width { overflow-wrap: break-word; }
+}
+
+@media (max-width: 900px) and (min-width: 681px) {
+  main [style*="position: relative"]:not(.hero-video) {
+    max-width: 100%;
+  }
+  main img[style*="left"], main video[style*="left"] { max-width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {

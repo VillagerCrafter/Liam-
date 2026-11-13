@@ -138,6 +138,8 @@
       <label>Layer order (front +)<input id="admin-z-index" type="number" step="1"></label>
       <button class="admin-full" id="admin-send-to-front" type="button">Bring to front</button>
       <button class="admin-full" id="admin-send-to-back" type="button">Send to back</button>
+      <button class="admin-full" id="admin-snap-even" type="button" disabled>Snap to even spacing</button>
+      <button class="admin-full" id="admin-snap-section" type="button" disabled>Snap to section grid</button>
       <button class="admin-full" id="admin-drag" type="button" aria-pressed="false">Drag selected element</button>
     </fieldset>
     </details>
@@ -270,12 +272,14 @@
   };
 
   const applyStyle = (element, styles = {}) => {
-    const numeric = { width: 2400, height: 1800, fontSize: 160, left: 1200, top: 1200, zIndex: 9999 };
+    const numeric = { width: 2400, height: 1800, fontSize: 300, left: 4000, top: 4000, zIndex: 9999 };
     for (const [name, maximum] of Object.entries(numeric)) {
       if (styles[name] !== undefined) element.style[name] = name === "zIndex"
         ? String(Math.max(-9999, Math.min(maximum, Number(styles[name]))))
-        : `${Math.max(name === "left" || name === "top" ? -1200 : 8, Math.min(maximum, Number(styles[name])))}px`;
+        : `${Math.max(name === "left" || name === "top" ? -4000 : 8, Math.min(maximum, Number(styles[name])))}px`;
     }
+    if ((styles.left !== undefined || styles.top !== undefined) &&
+        getComputedStyle(element).position === "static") element.style.position = "relative";
     if (/^#[0-9a-f]{3,8}$/i.test(styles.color || "")) element.style.color = styles.color;
     if (/^#[0-9a-f]{3,8}$/i.test(styles.backgroundColor || "")) element.style.backgroundColor = styles.backgroundColor;
     if (["400", "600", "700", "800"].includes(String(styles.fontWeight))) element.style.fontWeight = styles.fontWeight;
@@ -1061,6 +1065,10 @@
     }
     byId("admin-parent").disabled = !selected.parentElement?.matches(CANDIDATE_SELECTOR);
     byId("admin-delete").disabled = selected.tagName === "MAIN";
+    const mediaCount = selectionTargets().filter((element) =>
+      element instanceof HTMLImageElement || element instanceof HTMLVideoElement).length;
+    byId("admin-snap-even").disabled = mediaCount < 2;
+    byId("admin-snap-section").disabled = mediaCount < 1;
     for (const [id, name] of [["admin-width", "width"], ["admin-height", "height"], ["admin-font-size", "fontSize"], ["admin-left", "left"], ["admin-top", "top"], ["admin-z-index", "zIndex"]]) {
       byId(id).value = (name === "width" || name === "height" ? edit.resize?.[name] : undefined) ?? edit.styles?.[name] ?? "";
     }
@@ -1570,11 +1578,13 @@
     setStatus(editMode ? "Editing draft. Preview modes show the current unsaved design." : "Draft preview is active. The public website has not changed.");
   });
   byId("admin-publish").addEventListener("click", publish);
-  byId("admin-collapse").addEventListener("click", () => {
-    const collapsed = toolbar.classList.toggle("is-collapsed");
+  const adminMark = document.querySelector(".admin-mark") || document.body.appendChild(Object.assign(document.createElement("span"), { className: "admin-mark", textContent: "ADMINISTRATOR COPY" }));
+  const toggleToolbar = (collapsed) => {
+    toolbar.classList.toggle("is-collapsed", collapsed);
     byId("admin-collapse").textContent = collapsed ? "Show tools" : "Hide tools";
     byId("admin-collapse").setAttribute("aria-expanded", String(!collapsed));
     document.body.classList.toggle("cms-administrator-collapsed", collapsed);
+    adminMark.classList.toggle("admin-mark-active", !collapsed);
     if (collapsed) document.body.style.setProperty("--admin-sidebar-width", "33px");
     else {
       let savedWidth = 278;
@@ -1585,6 +1595,25 @@
       }
       setSidebarWidth(savedWidth);
     }
+  };
+  adminMark.setAttribute("role", "button");
+  adminMark.setAttribute("tabindex", "0");
+  adminMark.setAttribute("aria-label", "Show the website editing tools");
+  adminMark.classList.add("admin-mark-active");
+  adminMark.addEventListener("click", () => {
+    if (toolbar.classList.contains("is-collapsed")) {
+      toggleToolbar(false);
+      setStatus("Editing tools restored. Select an element to continue.");
+    }
+  });
+  adminMark.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      adminMark.click();
+    }
+  });
+  byId("admin-collapse").addEventListener("click", () => {
+    toggleToolbar(toolbar.classList.contains("is-collapsed") ? false : true);
   });
   document.querySelectorAll("[data-preview-mode]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -1685,6 +1714,76 @@
   bindNumberField("admin-z-index", "zIndex");
   byId("admin-send-to-front").addEventListener("click", () => updateSelectedStyles("zIndex", 9999));
   byId("admin-send-to-back").addEventListener("click", () => updateSelectedStyles("zIndex", -9999));
+
+  const snapTargets = () => selectionTargets().filter((element) =>
+    element instanceof HTMLImageElement || element instanceof HTMLVideoElement);
+  const setMediaOffset = (element, offsetX, offsetY) => {
+    const edit = state.edits[element.dataset.cmsId] ||= { styles: {} };
+    const frame = imageFrameFor(element);
+    const bounds = frame.getBoundingClientRect();
+    edit.resize = {
+      ...(edit.resize || { width: Math.round(bounds.width) || 400, height: Math.round(bounds.height) || 300 }),
+      offsetX: Math.round(offsetX),
+      offsetY: Math.round(offsetY),
+    };
+    applyImageResize(element, edit.resize);
+  };
+  byId("admin-snap-even").addEventListener("click", () => {
+    const media = snapTargets();
+    if (media.length < 2) {
+      setStatus("Select at least two images or videos first (Shift-click).", "error");
+      return;
+    }
+    const containers = new Map();
+    media.forEach((element) => {
+      const section = element.closest("main > section") || document.body;
+      if (!containers.has(section)) containers.set(section, []);
+      containers.get(section).push(element);
+    });
+    containers.forEach((items) => {
+      const ordered = items.sort((a, b) =>
+        (a.getBoundingClientRect().left + a.getBoundingClientRect().top) -
+        (b.getBoundingClientRect().left + b.getBoundingClientRect().top));
+      const slots = ordered.length;
+      const containerWidth = (ordered[0].closest("main > section") || document.body).getBoundingClientRect().width;
+      const slotWidth = containerWidth / slots;
+      ordered.forEach((element, index) => {
+        const bounds = imageFrameFor(element).getBoundingClientRect();
+        const targetLeft = slotWidth * index + (slotWidth - bounds.width) / 2;
+        const elementLeft = bounds.left;
+        const currentOffsetX = Number.parseFloat(imageFrameFor(element).style.left) || 0;
+        setMediaOffset(element, currentOffsetX + (targetLeft - elementLeft),
+          Number.parseFloat(imageFrameFor(element).style.top) || 0);
+      });
+    });
+    saveDraft();
+    setStatus("Selected media snapped into evenly spaced columns.");
+  });
+  byId("admin-snap-section").addEventListener("click", () => {
+    const media = snapTargets();
+    if (!media.length) {
+      setStatus("Select an image or video to snap it to the section grid.", "error");
+      return;
+    }
+    const section = media[0].closest("main > section");
+    if (!section) return;
+    const sectionRect = section.getBoundingClientRect();
+    const pageWidth = Math.min(1200, sectionRect.width);
+    const margin = Math.max(24, (sectionRect.width - pageWidth) / 2);
+    media.forEach((element) => {
+      const frame = imageFrameFor(element);
+      const bounds = frame.getBoundingClientRect();
+      const currentOffsetX = Number.parseFloat(frame.style.left) || 0;
+      const currentOffsetY = Number.parseFloat(frame.style.top) || 0;
+      const targetLeft = sectionRect.left + margin;
+      const targetTop = Math.round((sectionRect.height - bounds.height) / 2);
+      setMediaOffset(element,
+        currentOffsetX + (targetLeft - bounds.left),
+        currentOffsetY + (targetTop - bounds.top));
+    });
+    saveDraft();
+    setStatus("Media snapped to the section's content grid.");
+  });
   byId("admin-color").addEventListener("input", (event) => updateSelectedStyles("color", event.currentTarget.value));
   byId("admin-background").addEventListener("input", (event) => updateSelectedStyles("backgroundColor", event.currentTarget.value));
   byId("admin-filter").addEventListener("change", (event) => updateSelectedStyles("filter", event.currentTarget.value || undefined));

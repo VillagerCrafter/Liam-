@@ -483,6 +483,15 @@ server.mount_proc("/api/") do |request, response|
               (value.is_a?(Numeric) ? value.finite? : value.is_a?(String) && value.length <= 300)
           end
         )
+        numeric_style_bounds = {
+          "fontSize" => 8..300, "left" => -4_000..4_000, "top" => -4_000..4_000,
+          "width" => 40..2_400, "height" => 30..1_800,
+        }
+        valid_style_bounds = styles.nil? || styles.all? do |name, value|
+          next true unless numeric_style_bounds.key?(name) && value.is_a?(Numeric)
+
+          numeric_style_bounds[name].include?(value)
+        end
         resize = edit["resize"]
         valid_resize = resize.nil? || (
           resize.is_a?(Hash) &&
@@ -527,7 +536,7 @@ server.mount_proc("/api/") do |request, response|
           src.is_a?(String) && src.match?(%r{\A(?:https://\S+|/(?!/)\S*)\z}i)
         )
         valid_animation = !edit.key?("animation") || %w[none fade float spin pulse slideshow].include?(edit["animation"])
-        valid_styles && valid_style_values && valid_editor_state && valid_resize && valid_crop && valid_slideshow && valid_text &&
+        valid_styles && valid_style_values && valid_style_bounds && valid_editor_state && valid_resize && valid_crop && valid_slideshow && valid_text &&
           valid_media && valid_href && valid_src && valid_animation
       end
       shapes = content["shapes"] || []

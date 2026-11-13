@@ -99,6 +99,18 @@
     parent.append(caption);
   };
 
+  /* Mark images whose source fails to load so the frame shows a replace hint. */
+  const watchBrokenImages = () => {
+    document.querySelectorAll("img").forEach((image) => {
+      if (image.dataset.cmsBrokenWatched) return;
+      image.dataset.cmsBrokenWatched = "true";
+      const mark = () => image.classList.toggle("cms-image-missing", !image.currentSrc && !image.src || image.complete && image.naturalWidth === 0);
+      image.addEventListener("error", mark);
+      if (image.complete) mark();
+      else image.addEventListener("load", mark, { once: true });
+    });
+  };
+
   const applyHeroVideos = (settings) => {
     if (!heroVideo) return;
     window.clearInterval(heroVideoTimer);
@@ -143,8 +155,8 @@
       width: (value) => `${Math.max(40, Math.min(2400, Number(value)))}px`,
       height: (value) => `${Math.max(30, Math.min(1800, Number(value)))}px`,
       fontSize: (value) => `${Math.max(8, Math.min(300, Number(value)))}px`,
-      left: (value) => `${Math.max(-1200, Math.min(1200, Number(value)))}px`,
-      top: (value) => `${Math.max(-1200, Math.min(1200, Number(value)))}px`,
+      left: (value) => `${Math.max(-4000, Math.min(4000, Number(value)))}px`,
+      top: (value) => `${Math.max(-4000, Math.min(4000, Number(value)))}px`,
       zIndex: (value) => String(Math.max(-9999, Math.min(9999, Number(value)))),
       color: (value) => /^#[0-9a-f]{3,8}$/i.test(value) ? value : null,
       backgroundColor: (value) => /^#[0-9a-f]{3,8}$/i.test(value) ? value : null,
@@ -163,7 +175,7 @@
       const cssValue = allowed[name](value);
       if (cssValue) {
         element.style[name] = name === "fontFamily" && value === "custom" ? "LiamImportedFont, sans-serif" : cssValue;
-        if (name === "zIndex" && getComputedStyle(element).position === "static") element.style.position = "relative";
+        if ((name === "zIndex" || name === "left" || name === "top") && getComputedStyle(element).position === "static") element.style.position = "relative";
       }
     });
   };
@@ -614,12 +626,16 @@
   };
 
   assignContentIds();
+  watchBrokenImages();
   updatePublishedContent().catch((error) => console.error(error));
 
   if ("BroadcastChannel" in window) {
     const updates = new BroadcastChannel("liam-site-updates");
     updates.addEventListener("message", (event) => {
-      if (event.data === "published") updatePublishedContent().catch((error) => console.error(error));
+      if (event.data === "published") {
+        updatePublishedContent().catch((error) => console.error(error));
+        watchBrokenImages();
+      }
     });
   }
 })();
